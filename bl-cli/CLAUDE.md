@@ -119,9 +119,7 @@ export class HTLCError extends Error {
 ## Detailed Documentation
 
 For comprehensive information, see:
-- [`docs/implementation-status.md`](docs/implementation-status.md) - Phase completion details and test status
-- [`docs/technical-details.md`](docs/technical-details.md) - Architecture patterns and bug fixes
-- [`docs/development-guide.md`](docs/development-guide.md) - Development workflow and guidelines
+- [`IMPLEMENTATION_HISTORY.md`](IMPLEMENTATION_HISTORY.md) - Full implementation history, context, and detailed technical insights
 
 ## Key Implementation Notes
 

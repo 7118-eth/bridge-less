@@ -10,6 +10,7 @@
     "jsr:@std/internal@^1.0.6": "1.0.6",
     "jsr:@std/path@^1.0.8": "1.0.8",
     "jsr:@std/testing@1": "1.0.5",
+    "jsr:@wevm/viem@*": "2.23.5",
     "jsr:@wevm/viem@2": "2.23.5",
     "npm:@noble/curves@1.8.1": "1.8.1",
     "npm:@noble/hashes@1.7.1": "1.7.1",

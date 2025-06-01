@@ -79,7 +79,11 @@ export class Logger {
     parts.push(entry.message);
     
     if (entry.context && Object.keys(entry.context).length > 0) {
-      parts.push(JSON.stringify(entry.context));
+      // Convert BigInt to string for JSON serialization
+      const serializable = JSON.parse(JSON.stringify(entry.context, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+      ));
+      parts.push(JSON.stringify(serializable));
     }
     
     return parts.join(" ");

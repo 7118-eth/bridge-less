@@ -39,6 +39,7 @@ Deno.test("integration: end-to-end swap EVM to SVM", async () => {
     rpc: config.evm.rpc,
     rpcWs: config.evm.rpcWs,
     privateKey: config.evm.coordinatorPrivateKey,
+    chainId: config.evm.chainId,
     logger: logger.child("evm-client"),
   });
   
@@ -237,6 +238,7 @@ Deno.test("integration: swap with insufficient balance", async () => {
     rpc: config.evm.rpc,
     rpcWs: config.evm.rpcWs,
     privateKey: config.evm.coordinatorPrivateKey,
+    chainId: config.evm.chainId,
     logger: logger.child("evm-client"),
   });
   

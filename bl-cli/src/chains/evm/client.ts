@@ -22,9 +22,10 @@ import {
   parseEther,
   encodeFunctionData,
   decodeFunctionResult,
+  getAddress,
 } from "jsr:@wevm/viem@2";
 import { privateKeyToAccount } from "jsr:@wevm/viem@2/accounts";
-import { mainnet, localhost } from "jsr:@wevm/viem@2/chains";
+import { mainnet, localhost, anvil } from "jsr:@wevm/viem@2/chains";
 
 import type {
   IEvmClient,
@@ -147,8 +148,10 @@ export class EvmClient implements IEvmClient {
     switch (chainId) {
       case 1:
         return mainnet;
-      case 31337:
+      case 1337:
         return localhost;
+      case 31337:
+        return anvil;
       default:
         // Create custom chain
         return {
@@ -261,7 +264,7 @@ export class EvmClient implements IEvmClient {
     return retry(
       async () => {
         const balance = await this.publicClient.getBalance({
-          address: address as ViemAddress,
+          address: getAddress(address) as ViemAddress,
         });
         this.logger.debug("Got balance", { address, balance });
         return balance;
@@ -274,7 +277,7 @@ export class EvmClient implements IEvmClient {
     return retry(
       async () => {
         const count = await this.publicClient.getTransactionCount({
-          address: address as ViemAddress,
+          address: getAddress(address) as ViemAddress,
         });
         this.logger.debug("Got transaction count", { address, count });
         return count;
@@ -299,7 +302,7 @@ export class EvmClient implements IEvmClient {
       async () => {
         // Build parameters based on transaction type
         const params: any = {
-          to: tx.to as ViemAddress,
+          to: tx.to ? getAddress(tx.to) as ViemAddress : undefined,
           data: tx.data,
           value: tx.value,
           gas: tx.gas,
@@ -356,7 +359,7 @@ export class EvmClient implements IEvmClient {
 
         // Build transaction parameters
         const txParams: any = {
-          to: tx.to as ViemAddress,
+          to: tx.to ? getAddress(tx.to) as ViemAddress : undefined,
           data: tx.data,
           value: tx.value,
           gas,
@@ -406,7 +409,7 @@ export class EvmClient implements IEvmClient {
     return retry(
       async () => {
         const result = await this.publicClient.call({
-          to: params.address as ViemAddress,
+          to: getAddress(params.address) as ViemAddress,
           data: params.data,
           value: params.value,
         });
@@ -426,7 +429,7 @@ export class EvmClient implements IEvmClient {
     return retry(
       async () => {
         const logs = await this.publicClient.getLogs({
-          address: filter.address as ViemAddress,
+          address: filter.address ? getAddress(filter.address) as ViemAddress : undefined,
           fromBlock: filter.fromBlock,
           toBlock: filter.toBlock,
         });
