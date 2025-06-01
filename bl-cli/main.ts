@@ -130,7 +130,7 @@ async function createCoordinator(): Promise<Coordinator> {
       } else {
         // Base58 format
         const bs58 = await import("npm:bs58@5");
-        const privateKeyBytes = bs58.decode(privateKeyStr);
+        const privateKeyBytes = bs58.default.decode(privateKeyStr);
         keypair = Keypair.fromSecretKey(privateKeyBytes);
       }
       
