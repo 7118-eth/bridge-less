@@ -8,6 +8,8 @@ import { parseArgs } from "jsr:@std/cli@1";
 import { load } from "jsr:@std/dotenv@0";
 import { Coordinator, type CoordinatorConfig, ChainType, type SwapRequest } from "./src/coordinator/index.ts";
 import { EvmClient, HTLCManager } from "./src/chains/evm/index.ts";
+import { SolanaClient, SolanaHTLCManager } from "./src/chains/solana/index.ts";
+import { Keypair } from "npm:@solana/web3.js@2";
 import { createLogger } from "./src/utils/logger.ts";
 import { readFileSync } from "node:fs";
 
@@ -27,6 +29,13 @@ function loadConfig(): CoordinatorConfig {
       privateKey: Deno.env.get("evm_coordinator_private_key") || "",
       tokenAddress: (Deno.env.get("evm_token_contract_address") || "") as any,
       htlcFactoryAddress: (Deno.env.get("evm_htlc_contract_address") || "") as any,
+    },
+    solanaConfig: {
+      rpcUrl: Deno.env.get("svm_rpc") || "http://localhost:8899",
+      rpcWsUrl: Deno.env.get("svm_rpc_ws"),
+      privateKey: Deno.env.get("svm_coordinator_private_key") || "",
+      tokenMintAddress: Deno.env.get("svm_token_contract_address") || "",
+      htlcProgramAddress: Deno.env.get("svm_htlc_contract_address") || "",
     },
     timelocks: {
       finality: parseInt(Deno.env.get("finality_period") || "30"),
@@ -50,6 +59,12 @@ function loadConfig(): CoordinatorConfig {
   }
   if (!config.evmConfig.htlcFactoryAddress) {
     throw new Error("EVM HTLC factory contract address not configured");
+  }
+
+  // Optional Solana validation
+  if (config.solanaConfig?.privateKey && 
+      (!config.solanaConfig.tokenMintAddress || !config.solanaConfig.htlcProgramAddress)) {
+    throw new Error("Solana configuration incomplete");
   }
 
   return config;
@@ -95,11 +110,50 @@ async function createCoordinator(): Promise<Coordinator> {
     factoryAbi,
   });
 
+  // Create Solana clients if configured
+  let solanaClient: SolanaClient | undefined;
+  let solanaHTLCManager: SolanaHTLCManager | undefined;
+  
+  if (config.solanaConfig?.privateKey) {
+    // Parse Solana private key
+    let keypair: Keypair;
+    const privateKeyStr = config.solanaConfig.privateKey;
+    
+    if (privateKeyStr.startsWith('[')) {
+      // Array format
+      const privateKeyArray = JSON.parse(privateKeyStr);
+      keypair = Keypair.fromSecretKey(new Uint8Array(privateKeyArray));
+    } else {
+      // Base58 format
+      const bs58 = await import("npm:bs58@5");
+      const privateKeyBytes = bs58.decode(privateKeyStr);
+      keypair = Keypair.fromSecretKey(privateKeyBytes);
+    }
+    
+    solanaClient = new SolanaClient({
+      rpcUrl: config.solanaConfig.rpcUrl,
+      rpcWsUrl: config.solanaConfig.rpcWsUrl,
+    }, logger.child({ module: "solana-client" }));
+    
+    await solanaClient.connect();
+    
+    solanaHTLCManager = new SolanaHTLCManager({
+      client: solanaClient,
+      programId: config.solanaConfig.htlcProgramAddress,
+      tokenMint: config.solanaConfig.tokenMintAddress,
+      keypair,
+      logger: logger.child({ module: "solana-htlc" }),
+    });
+  }
+
   // Create coordinator
   const coordinator = new Coordinator({
     config,
     evmClient,
     htlcManager,
+    solanaClient,
+    solanaHTLCManager,
+    logger: logger.child({ module: "coordinator" }),
   });
 
   await coordinator.initialize();
