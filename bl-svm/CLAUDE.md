@@ -294,24 +294,30 @@ pub struct HTLCCancelled {
 ### Current Status (as of last commit)
 - **Program ID**: `7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY`
 - **Build Status**: ✅ Successfully compiling with Anchor 0.31.1
-- **Test Status**: 6/10 tests passing
+- **Test Status**: ✅ ALL 10/10 tests passing
   - ✅ HTLC creation tests
-  - ✅ Invalid parameter validation tests  
+  - ✅ Invalid parameter validation tests
+  - ✅ Withdrawal with preimage tests
+  - ✅ Cancellation after timeout tests
+  - ✅ Double-operation prevention tests
   - ✅ Concurrent HTLC handling
-  - ❌ 4 tests failing due to blockchain time synchronization issues
+  - ✅ Edge case validation
 - **Dependencies**: 
   - `anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }`
   - `anchor-spl = { version = "0.31.1", features = ["token"] }`
   - Test dependencies include `@solana/spl-token` for token operations
 
 ### Known Issues & Solutions
-1. **Timing Issues in Tests**: Tests use `Math.floor(Date.now() / 1000)` but blockchain time may differ
-   - Solution: Use bankrun tests or add buffer time for blockchain latency
-   - Alternative: Query blockchain clock before creating HTLCs
+1. **✅ RESOLVED - Timing Issues in Tests**: Tests were failing due to blockchain time synchronization
+   - **Root Cause**: Running tests with external local validator caused timing conflicts
+   - **Solution**: Stop external validator and let `anchor test` manage its own test validator
+   - **Result**: All timing-sensitive tests now pass consistently
 
 2. **Import Warnings**: Tests show ES module warnings
-   - Solution: Either add `"type": "module"` to package.json or use .mjs extension
-   - Current approach: Keep CommonJS for compatibility
+   - **Warning**: `Module type of file:///Users/.../tests/bl-svm.ts is not specified`
+   - **Impact**: Performance overhead but tests still pass
+   - **Solution**: Either add `"type": "module"` to package.json or use .mjs extension
+   - **Current approach**: Keep CommonJS for compatibility (warnings are non-blocking)
 
 3. **Borrow Checker**: Had to carefully manage mutable borrows in instruction handlers
    - Solution: Extract values before borrowing mutably for account transfers
@@ -364,10 +370,11 @@ pub struct HTLCCancelled {
 4. **Event Design**: Including EVM addresses as byte arrays in events helps coordinator track cross-chain state
 
 ### Testing Insights
-- Use `anchor test --skip-local-validator` when validator is already running
+- **CRITICAL**: Stop external validators before running `anchor test` - let it manage its own test validator
+- Use `anchor test --skip-local-validator` only when validator is already running and properly synchronized
 - Program ID mismatches are common - always check deployed ID matches code
-- Timing tests are tricky on local validator - consider mocking time or using bankrun
 - SPL token setup in tests requires creating mint, then token accounts, then minting
+- All 10 tests now pass consistently with proper validator management
 
 ### File Structure Best Practices
 - Keep instruction handlers minimal - just parameter validation and state updates
