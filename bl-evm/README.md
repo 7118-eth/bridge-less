@@ -56,13 +56,15 @@ anvil
 
 2. In a new terminal, deploy the contracts:
 ```bash
-# Deploy all contracts
+# Deploy all contracts (no private key needed for Anvil)
 forge script script/DeployAll.s.sol --rpc-url http://localhost:8545 --broadcast
 
 # Or deploy individually
 forge script script/Token.s.sol --rpc-url http://localhost:8545 --broadcast
 forge script script/HTLCFactory.s.sol --rpc-url http://localhost:8545 --broadcast
 ```
+
+**Note**: When deploying to Anvil (chainId 31337) without a PRIVATE_KEY environment variable, the scripts will automatically use Anvil's default account (0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266).
 
 ### Base Sepolia Deployment (Testnet)
 
