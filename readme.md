@@ -13,7 +13,7 @@ This project demonstrates a minimal cross-chain atomic swap mechanism where a co
 
 ## Project Structure
 
-The monorepo contains three main components:
+The monorepo contains three main components and a git submodule:
 
 ### 1. `bl-cli/` - Coordinator CLI (TypeScript/Deno)
 
@@ -76,6 +76,26 @@ Anchor-based program for the Solana side:
 - Each HTLC is a unique PDA derived from `htlc_id`
 - Associated token account holds escrowed funds
 - Events mirror EVM side for coordinator tracking
+
+### 4. `cross-chain-swap/` - Production-Ready 1inch Contracts (Git Submodule)
+
+A modified version of 1inch's Fusion Atomic Swaps protocol adapted for Ethereum-Solana swaps:
+
+- **Branch**: `feature/eth-solana-atomic-swap`
+- **Key Adaptations**:
+  - **SHA256 Hashing**: Changed from Keccak-256 to SHA-256 for Solana compatibility
+  - **Non-EVM Address Support**: Added `bytes32 dstRecipient` field for 32-byte Solana addresses
+  - **Backward Compatible**: Maintains compatibility with EVM-to-EVM swaps
+  - **Chain Detection**: MSB of `dstChainId` indicates non-EVM chains (1 = non-EVM)
+
+**Technical Details**:
+- Modified `BaseEscrow.sol` and `BaseEscrowFactory.sol` contracts
+- Emits `NonEVMRecipient` event for cross-chain monitoring
+- Immutables size increased from 160 to 192 bytes
+- All tests updated and passing with SHA-256
+- Solana Chain ID: 1399811149 (with non-EVM flag: `0x8000...537A8C2D`)
+
+This submodule represents the future production path beyond the PoC, providing battle-tested contracts with proper security audits and comprehensive features like partial fills via Merkle trees and rescue functions.
 
 ## How It Works
 
