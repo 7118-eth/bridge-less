@@ -47,6 +47,11 @@ The project appears to be part of a "bridge-less" solution for 1inch protocol, c
 ### Overview
 Building a trustless bridge between EVM and Solana using Hashed Timelock Contracts (HTLCs). The bridge operates with liquidity providers on both chains, coordinated by an external CLI tool.
 
+**Token Setup:**
+- Token uses 6 decimals (1 token = 1e6 units)
+- Liquidity providers pre-fund 10,000 tokens (10_000e6 units) on each chain
+- Individual swaps use 1 token (1e6 units) for testing
+
 ### Core Design Decisions
 
 #### Contract Architecture: Factory Pattern (Proof of Concept)
@@ -156,15 +161,17 @@ Using a factory pattern for better isolation and security in our proof of concep
    - Test refund before timelock (should fail)
    - Test double-claim prevention
    - Test double-refund prevention
-   - Test with 10k token amounts (as specified)
+   - Test with 1 token swaps (1e6 units with 6 decimals)
    - Test only sender can refund
    - Test anyone can claim with correct preimage
 
 3. **Integration Tests** (`test/HTLCBridge.t.sol`)
+   - Pre-fund liquidity providers with 10k tokens (10_000e6 units)
    - Test end-to-end flow with Token.sol
-   - Deploy multiple HTLCs through factory
+   - Deploy multiple HTLCs with 1 token amounts (1e6 units)
    - Simulate bridge scenario with concurrent HTLCs
    - Test coordinator event tracking
+   - Verify liquidity provider balances after swaps
    - Gas usage analysis
 
 4. **Edge Cases**
