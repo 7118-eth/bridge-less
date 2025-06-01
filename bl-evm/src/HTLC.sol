@@ -134,10 +134,4 @@ contract HTLC is IHTLC {
         
         emit HTLCCancelled(address(this), msg.sender);
     }
-    
-    /// @notice Get the token address (for backward compatibility)
-    /// @return The source token address
-    function token() external view returns (address) {
-        return srcToken;
-    }
 }

@@ -120,8 +120,4 @@ interface IHTLC {
     /// @notice Cancel the HTLC and return funds to source address
     /// @dev Only callable after cancellation deadline
     function cancel() external;
-    
-    /// @notice Get the token address (backward compatibility)
-    /// @return The source token address
-    function token() external view returns (address);
 }

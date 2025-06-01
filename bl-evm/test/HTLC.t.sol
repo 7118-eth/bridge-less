@@ -58,7 +58,6 @@ contract HTLCTest is Test {
         assertEq(htlc.dstAddress(), dstAddress);
         assertEq(htlc.srcToken(), address(token));
         assertEq(htlc.dstToken(), SOLANA_USDC);
-        assertEq(htlc.token(), address(token)); // Backward compatibility
         assertEq(htlc.amount(), AMOUNT);
         assertEq(htlc.hashlock(), hashlock);
         
