@@ -20,6 +20,7 @@
     "npm:@solana/spl-token@0.3": "0.3.11_@solana+web3.js@1.95.8",
     "npm:@solana/web3.js@1.95": "1.95.8",
     "npm:abitype@1.0.8": "1.0.8",
+    "npm:bigint-buffer@^1.1.5": "1.1.5",
     "npm:bs58@5": "5.0.0",
     "npm:isows@1.0.6": "1.0.6_ws@8.18.1",
     "npm:ox@0.6.7": "0.6.7"
@@ -610,7 +611,8 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@std/assert@1"
+      "jsr:@std/assert@1",
+      "npm:bigint-buffer@^1.1.5"
     ]
   }
 }
