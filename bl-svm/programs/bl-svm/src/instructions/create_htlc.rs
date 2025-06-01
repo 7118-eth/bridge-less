@@ -1,84 +1,7 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::AssociatedToken,
-    token::{transfer, Mint, Token, TokenAccount, Transfer},
-};
+use anchor_spl::token::{transfer, Transfer};
 
-use crate::{errors::HTLCError, events::HTLCCreated, state::HTLC};
-
-/// Parameters for creating an HTLC
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct CreateHTLCParams {
-    /// Cross-chain identifier
-    pub htlc_id: [u8; 32],
-    /// EVM recipient address
-    pub dst_address: [u8; 20],
-    /// ERC20 token on EVM
-    pub dst_token: [u8; 20],
-    /// Token amount (with 6 decimals)
-    pub amount: u64,
-    /// Native SOL for incentives
-    pub safety_deposit: u64,
-    /// SHA256 hash
-    pub hashlock: [u8; 32],
-    /// Unix timestamp when finality period ends
-    pub finality_deadline: i64,
-    /// Unix timestamp when resolver exclusive period ends
-    pub resolver_deadline: i64,
-    /// Unix timestamp when public withdrawal period ends
-    pub public_deadline: i64,
-    /// Unix timestamp when cancellation is allowed
-    pub cancellation_deadline: i64,
-}
-
-/// Accounts required for creating an HTLC
-#[derive(Accounts)]
-#[instruction(params: CreateHTLCParams)]
-pub struct CreateHTLC<'info> {
-    /// Resolver/coordinator creating the HTLC
-    #[account(mut)]
-    pub resolver: Signer<'info>,
-
-    /// HTLC PDA account
-    #[account(
-        init,
-        payer = resolver,
-        space = HTLC::SIZE,
-        seeds = [b"htlc", params.htlc_id.as_ref()],
-        bump
-    )]
-    pub htlc: Account<'info, HTLC>,
-
-    /// Token mint
-    pub token_mint: Account<'info, Mint>,
-
-    /// Resolver's token account (source of funds)
-    #[account(
-        mut,
-        associated_token::mint = token_mint,
-        associated_token::authority = resolver,
-    )]
-    pub resolver_token_account: Account<'info, TokenAccount>,
-
-    /// HTLC's token vault PDA
-    #[account(
-        init,
-        payer = resolver,
-        associated_token::mint = token_mint,
-        associated_token::authority = htlc,
-        associated_token::token_program = token_program,
-    )]
-    pub htlc_vault: Account<'info, TokenAccount>,
-
-    /// System program
-    pub system_program: Program<'info, System>,
-
-    /// Token program
-    pub token_program: Program<'info, Token>,
-
-    /// Associated token program
-    pub associated_token_program: Program<'info, AssociatedToken>,
-}
+use crate::{errors::HTLCError, events::HTLCCreated, CreateHTLC, CreateHTLCParams};
 
 /// Handler for creating an HTLC
 pub fn handler(ctx: Context<CreateHTLC>, params: CreateHTLCParams) -> Result<()> {
@@ -166,4 +89,3 @@ pub fn handler(ctx: Context<CreateHTLC>, params: CreateHTLCParams) -> Result<()>
 
     Ok(())
 }
-
