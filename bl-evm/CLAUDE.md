@@ -82,9 +82,8 @@ Using a factory pattern for better isolation and security in our proof of concep
        bytes32 dstAddress,     // Maker's Solana address (destination)
        address token,          // ERC20 token
        uint256 amount,         // Token amount
-       bytes32 hashlock,       // SHA256 hash
-       uint256 safetyDeposit   // Native token deposit
-   ) external payable returns (address htlcContract, bytes32 htlcId);
+       bytes32 hashlock       // SHA256 hash
+   ) external returns (address htlcContract, bytes32 htlcId);
    ```
 
 2. **HTLC.sol** - Individual HTLC contract (FusionPlus style)
@@ -97,7 +96,6 @@ Using a factory pattern for better isolation and security in our proof of concep
    address public immutable token;
    uint256 public immutable amount;
    bytes32 public immutable hashlock;
-   uint256 public immutable safetyDeposit;  // Native token incentive
    
    // Timelock structure (FusionPlus style)
    uint256 public immutable finalityDeadline;    // When secret can be revealed
@@ -127,7 +125,6 @@ Using a factory pattern for better isolation and security in our proof of concep
        address token,
        uint256 amount,
        bytes32 hashlock,
-       uint256 safetyDeposit,
        uint256 finalityDeadline
    );
    
@@ -135,14 +132,12 @@ Using a factory pattern for better isolation and security in our proof of concep
    event HTLCWithdrawn(
        address indexed htlcContract,
        bytes32 preimage,
-       address executor,      // Who executed the withdrawal
-       uint256 safetyDeposit  // Amount claimed by executor
+       address executor      // Who executed the withdrawal
    );
    
    event HTLCCancelled(
        address indexed htlcContract,
-       address executor,
-       uint256 safetyDeposit
+       address executor
    );
    ```
 
@@ -163,7 +158,6 @@ Using a factory pattern for better isolation and security in our proof of concep
   - Public period: Anyone can help complete the swap
   - Cancellation period: Return funds if swap failed
 - SafeTransferFrom for ERC20 operations
-- Safety deposits incentivize proper execution
 - Resolver must provide tokens upfront (not pull from maker)
 
 ### Testing Strategy
@@ -220,7 +214,7 @@ Using a factory pattern for better isolation and security in our proof of concep
   - Resolver exclusive: 60 seconds
   - Public withdrawal: 300 seconds (5 minutes)
   - Cancellation deadline: 600 seconds (10 minutes)
-- Safety deposit: 0.001 ETH (enough to incentivize execution)
+- No safety deposits for PoC (coordinator handles everything)
 - Consider adding pause mechanism for emergencies
 - Monitor for front-running during public withdrawal period
 
@@ -235,7 +229,7 @@ Using a factory pattern for better isolation and security in our proof of concep
    - Reveals secret only after verifying both escrows exist
    
 3. **Completion**:
-   - Withdraws on source chain (gets maker's tokens + safety deposit)
+   - Withdraws on source chain (gets maker's tokens)
    - Withdraws on destination chain (sends tokens to maker's Solana address)
    
 4. **Monitoring**:
@@ -248,4 +242,4 @@ Using a factory pattern for better isolation and security in our proof of concep
 - Each HTLC is independent - failure of one doesn't affect others
 - Factory upgrade path: deploy new factory, migrate coordinator
 - HTLCs are minimal - only essential functions to reduce deployment cost
-- Coordinator needs ETH balance for safety deposits
+- No safety deposits in PoC - simplified economics
