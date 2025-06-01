@@ -101,7 +101,7 @@ const EVENT_DISCRIMINATORS = {
   "nodeModulesDir": "auto"
 }
 ```
-Then run `npm install` to install dependencies.
+Then run `deno install --allow-scripts` to install dependencies.
 
 **Result**: Full Solana functionality now works!
 
@@ -282,7 +282,7 @@ const solanaAddress = new PublicKey(base58String);
 
 ### 2. Install Dependencies
 ```bash
-npm install  # Run this once to install node modules
+deno install --allow-scripts  # Run this once to install node modules
 ```
 
 ### 3. Fix Common Issues
