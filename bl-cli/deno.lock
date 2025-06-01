@@ -20,6 +20,7 @@
     "npm:@solana/spl-token@0.3": "0.3.11_@solana+web3.js@1.95.8",
     "npm:@solana/web3.js@1.95": "1.95.8",
     "npm:abitype@1.0.8": "1.0.8",
+    "npm:bs58@5": "5.0.0",
     "npm:isows@1.0.6": "1.0.6_ws@8.18.1",
     "npm:ox@0.6.7": "0.6.7"
   },
@@ -87,7 +88,7 @@
         "@noble/hashes",
         "@solana/web3.js",
         "bn.js",
-        "bs58",
+        "bs58@4.0.1",
         "buffer-layout",
         "camelcase",
         "cross-fetch",
@@ -242,7 +243,7 @@
         "bigint-buffer",
         "bn.js",
         "borsh",
-        "bs58",
+        "bs58@4.0.1",
         "buffer",
         "fast-stable-stringify",
         "jayson",
@@ -302,6 +303,9 @@
         "safe-buffer"
       ]
     },
+    "base-x@4.0.0": {
+      "integrity": "sha512-FuwxlW4H5kh37X/oW59pwTzzTKRzfrrQwhmyspRM7swOEZcHtDZSCt45U6oKgtuFE+WYPblePMVIPR4RZrh/hw=="
+    },
     "base64-js@1.5.1": {
       "integrity": "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="
     },
@@ -328,14 +332,20 @@
       "integrity": "sha512-CLCsZGIBCFnPtkNnieW/a8wmreDmfUtjU2m9yHrzPXIlNbqVs0AQrSatSG6vdNYUqdc83tkQi2eHfF98ubzQLA==",
       "dependencies": [
         "bn.js",
-        "bs58",
+        "bs58@4.0.1",
         "text-encoding-utf-8"
       ]
     },
     "bs58@4.0.1": {
       "integrity": "sha512-Ok3Wdf5vOIlBrgCvTq96gBkJw+JUEzdBgyaza5HLtPm7yTHkjRy8+JzNyHF7BHa0bNWOQIp3m5YF0nnFcOIKLw==",
       "dependencies": [
-        "base-x"
+        "base-x@3.0.10"
+      ]
+    },
+    "bs58@5.0.0": {
+      "integrity": "sha512-r+ihvQJvahgYT50JD05dyJNKlmmSlMoOGwn1lCcEzanPglg7TxYjioQUYehQ9mAR/+hOSd2jRc/Z2y5UxBymvQ==",
+      "dependencies": [
+        "base-x@4.0.0"
       ]
     },
     "buffer-layout@1.2.2": {

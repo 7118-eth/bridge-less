@@ -8,8 +8,7 @@ import { parseArgs } from "jsr:@std/cli@1";
 import { load } from "jsr:@std/dotenv@0";
 import { Coordinator, type CoordinatorConfig, ChainType, type SwapRequest } from "./src/coordinator/index.ts";
 import { EvmClient, HTLCManager } from "./src/chains/evm/index.ts";
-import { SolanaClient, SolanaHTLCManager } from "./src/chains/solana/index.ts";
-import { Keypair } from "npm:@solana/web3.js@1.95";
+// Solana imports will be loaded dynamically if needed
 import { createLogger } from "./src/utils/logger.ts";
 import { readFileSync } from "node:fs";
 
@@ -111,39 +110,48 @@ async function createCoordinator(): Promise<Coordinator> {
   });
 
   // Create Solana clients if configured
-  let solanaClient: SolanaClient | undefined;
-  let solanaHTLCManager: SolanaHTLCManager | undefined;
+  let solanaClient: any | undefined;
+  let solanaHTLCManager: any | undefined;
   
   if (config.solanaConfig?.privateKey) {
-    // Parse Solana private key
-    let keypair: Keypair;
-    const privateKeyStr = config.solanaConfig.privateKey;
-    
-    if (privateKeyStr.startsWith('[')) {
-      // Array format
-      const privateKeyArray = JSON.parse(privateKeyStr);
-      keypair = Keypair.fromSecretKey(new Uint8Array(privateKeyArray));
-    } else {
-      // Base58 format
-      const bs58 = await import("npm:bs58@5");
-      const privateKeyBytes = bs58.decode(privateKeyStr);
-      keypair = Keypair.fromSecretKey(privateKeyBytes);
+    try {
+      // Dynamically import Solana modules
+      const { SolanaClient, SolanaHTLCManager } = await import("./src/chains/solana/index.ts");
+      const { Keypair } = await import("npm:@solana/web3.js@1.95");
+      
+      // Parse Solana private key
+      let keypair: any;
+      const privateKeyStr = config.solanaConfig.privateKey;
+      
+      if (privateKeyStr.startsWith('[')) {
+        // Array format
+        const privateKeyArray = JSON.parse(privateKeyStr);
+        keypair = Keypair.fromSecretKey(new Uint8Array(privateKeyArray));
+      } else {
+        // Base58 format
+        const bs58 = await import("npm:bs58@5");
+        const privateKeyBytes = bs58.decode(privateKeyStr);
+        keypair = Keypair.fromSecretKey(privateKeyBytes);
+      }
+      
+      solanaClient = new SolanaClient({
+        rpcUrl: config.solanaConfig.rpcUrl,
+        rpcWsUrl: config.solanaConfig.rpcWsUrl,
+      }, logger.child({ module: "solana-client" }));
+      
+      await solanaClient.connect();
+      
+      solanaHTLCManager = new SolanaHTLCManager({
+        client: solanaClient,
+        programId: config.solanaConfig.htlcProgramAddress,
+        tokenMint: config.solanaConfig.tokenMintAddress,
+        keypair,
+        logger: logger.child({ module: "solana-htlc" }),
+      });
+    } catch (error) {
+      logger.warn("Failed to initialize Solana clients", { error: error.message });
+      logger.info("Continuing with EVM-only mode");
     }
-    
-    solanaClient = new SolanaClient({
-      rpcUrl: config.solanaConfig.rpcUrl,
-      rpcWsUrl: config.solanaConfig.rpcWsUrl,
-    }, logger.child({ module: "solana-client" }));
-    
-    await solanaClient.connect();
-    
-    solanaHTLCManager = new SolanaHTLCManager({
-      client: solanaClient,
-      programId: config.solanaConfig.htlcProgramAddress,
-      tokenMint: config.solanaConfig.tokenMintAddress,
-      keypair,
-      logger: logger.child({ module: "solana-htlc" }),
-    });
   }
 
   // Create coordinator
