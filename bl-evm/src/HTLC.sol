@@ -2,8 +2,13 @@
 pragma solidity ^0.8.19;
 
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
+import {IHTLC} from "./interfaces/IHTLC.sol";
 
-contract HTLC {
+/// @title HTLC - Hash Time Locked Contract Implementation
+/// @author Bridge-less Protocol
+/// @notice Individual HTLC contract for FusionPlus-inspired atomic swaps
+/// @dev Deployed by HTLCFactory with immutable parameters
+contract HTLC is IHTLC {
     // Immutable state (set in constructor)
     address public immutable factory;
     address public immutable resolver;     // Who creates the escrow (coordinator)
@@ -23,29 +28,15 @@ contract HTLC {
     bool public withdrawn;
     bool public cancelled;
     
-    // Events
-    event HTLCWithdrawn(
-        address indexed htlcContract,
-        bytes32 preimage,
-        address executor      // Who executed the withdrawal
-    );
     
-    event HTLCCancelled(
-        address indexed htlcContract,
-        address executor
-    );
-    
-    // Errors
-    error InvalidPreimage();
-    error AlreadyWithdrawn();
-    error AlreadyCancelled();
-    error NotInFinalityPeriod();
-    error NotInResolverPeriod();
-    error NotInPublicPeriod();
-    error NotInCancellationPeriod();
-    error OnlyResolver();
-    error TransferFailed();
-    
+    /// @notice Initializes a new HTLC contract
+    /// @dev Only callable by the factory contract
+    /// @param _resolver Address of the resolver (coordinator)
+    /// @param _srcAddress Source address providing the tokens
+    /// @param _dstAddress Destination address on Solana
+    /// @param _token ERC20 token to be locked
+    /// @param _amount Amount of tokens to lock
+    /// @param _hashlock SHA256 hash that must be unlocked
     constructor(
         address _resolver,
         address _srcAddress,
@@ -69,6 +60,7 @@ contract HTLC {
         cancellationDeadline = block.timestamp + 600; // 10 minutes total before cancellation
     }
     
+    /// @inheritdoc IHTLC
     function withdrawToDestination(bytes32 preimage) external {
         // Check state
         if (withdrawn) revert AlreadyWithdrawn();
@@ -97,6 +89,7 @@ contract HTLC {
         emit HTLCWithdrawn(address(this), preimage, msg.sender);
     }
     
+    /// @inheritdoc IHTLC
     function publicWithdraw(bytes32 preimage) external {
         // Check state
         if (withdrawn) revert AlreadyWithdrawn();
@@ -119,6 +112,7 @@ contract HTLC {
         emit HTLCWithdrawn(address(this), preimage, msg.sender);
     }
     
+    /// @inheritdoc IHTLC
     function cancel() external {
         // Check state
         if (withdrawn) revert AlreadyWithdrawn();
