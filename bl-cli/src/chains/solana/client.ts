@@ -2,23 +2,20 @@
  * Solana client implementation using Anza Kit
  */
 
-import { createSolanaRpc, createSolanaRpcSubscriptions } from "npm:@solana/kit";
-import { getBase58Encoder, getBase58Decoder } from "npm:@solana/codecs";
 import {
   Connection,
   PublicKey,
   Keypair,
-  Transaction as Web3Transaction,
+  Transaction,
   sendAndConfirmTransaction,
   LAMPORTS_PER_SOL,
-} from "npm:@solana/web3.js@2";
+} from "npm:@solana/web3.js@1.95";
 import type {
   ISolanaClient,
   SolanaClientConfig,
   TransactionConfirmation,
   TransactionDetails,
   LogEvent,
-  Transaction,
 } from "./types.ts";
 import { SolanaError, SolanaErrorCode } from "./types.ts";
 import { Logger } from "../../utils/logger.ts";
@@ -28,8 +25,6 @@ import { retry } from "../../utils/retry.ts";
  * Solana client implementation
  */
 export class SolanaClient implements ISolanaClient {
-  private rpc: any;
-  private rpcSubscriptions: any;
   private connection: Connection;
   private config: SolanaClientConfig;
   private logger: Logger;
@@ -42,15 +37,7 @@ export class SolanaClient implements ISolanaClient {
     };
     this.logger = logger || new Logger("solana-client");
     
-    // Initialize Anza Kit RPC
-    this.rpc = createSolanaRpc(config.rpcUrl);
-    
-    // Initialize WebSocket subscriptions if provided
-    if (config.rpcWsUrl) {
-      this.rpcSubscriptions = createSolanaRpcSubscriptions(config.rpcWsUrl);
-    }
-    
-    // Also create web3.js Connection for compatibility
+    // Create web3.js Connection
     this.connection = new Connection(config.rpcUrl, this.config.commitment);
   }
 
@@ -97,8 +84,7 @@ export class SolanaClient implements ISolanaClient {
       const ownerPubkey = new PublicKey(owner);
       
       // Get associated token account
-      const { PublicKey: SPLPublicKey } = await import("npm:@solana/spl-token@0.4");
-      const { getAssociatedTokenAddress } = await import("npm:@solana/spl-token@0.4");
+      const { getAssociatedTokenAddress } = await import("npm:@solana/spl-token@0.3");
       
       const ataAddress = await getAssociatedTokenAddress(
         mintPubkey,
@@ -112,7 +98,7 @@ export class SolanaClient implements ISolanaClient {
       }
       
       // Parse token account data
-      const { AccountLayout } = await import("npm:@solana/spl-token@0.4");
+      const { AccountLayout } = await import("npm:@solana/spl-token@0.3");
       const data = AccountLayout.decode(accountInfo.data);
       
       return BigInt(data.amount.toString());
@@ -129,15 +115,15 @@ export class SolanaClient implements ISolanaClient {
     }
   }
 
-  async sendTransaction(transaction: Transaction): Promise<string> {
+  async sendTransaction(transaction: any): Promise<string> {
     try {
-      // For compatibility, we expect Web3Transaction
-      const web3Tx = transaction as Web3Transaction;
+      // Transaction should be a web3.js Transaction
+      const tx = transaction as Transaction;
       
       // Send with retry logic
       const signature = await retry(
         async () => {
-          return await this.connection.sendTransaction(web3Tx, {
+          return await this.connection.sendTransaction(tx, {
             skipPreflight: false,
             preflightCommitment: this.config.commitment,
           });
