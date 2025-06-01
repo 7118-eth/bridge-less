@@ -77,11 +77,12 @@ Anchor-based program for the Solana side:
 - Associated token account holds escrowed funds
 - Events mirror EVM side for coordinator tracking
 
-### 4. `cross-chain-swap/` - Production-Ready 1inch Contracts (Git Submodule)
+### 4. `cross-chain-swap/` - Modified 1inch Fusion+ Contracts (Git Submodule)
 
-A modified version of 1inch's Fusion Atomic Swaps protocol adapted for Ethereum-Solana swaps:
+A proof-of-concept modification of 1inch's Fusion+ Atomic Swaps protocol adapted for Ethereum-Solana swaps:
 
 - **Branch**: `feature/eth-solana-atomic-swap`
+- **Status**: Proof of concept - NOT audited or production-ready
 - **Key Adaptations**:
   - **SHA256 Hashing**: Changed from Keccak-256 to SHA-256 for Solana compatibility
   - **Non-EVM Address Support**: Added `bytes32 dstRecipient` field for 32-byte Solana addresses
@@ -95,7 +96,7 @@ A modified version of 1inch's Fusion Atomic Swaps protocol adapted for Ethereum-
 - All tests updated and passing with SHA-256
 - Solana Chain ID: 1399811149 (with non-EVM flag: `0x8000...537A8C2D`)
 
-This submodule represents the future production path beyond the PoC, providing battle-tested contracts with proper security audits and comprehensive features like partial fills via Merkle trees and rescue functions.
+⚠️ **Important**: This is a proof-of-concept implementation demonstrating how 1inch Fusion+ can be extended to non-EVM chains. It requires security audits and extensive testing before any production use.
 
 ## How It Works
 
