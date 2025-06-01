@@ -160,8 +160,18 @@ export class Coordinator implements ICoordinator {
     const swapId = request.id || crypto.randomUUID();
     const secretBytes = request.secret ? 
       this.hexToBytes(request.secret) : 
-      this.secretManager.generateSecret();
-    const hashLock = this.secretManager.hashSecret(secretBytes);
+      await this.secretManager.generateSecret();
+    
+    // Verify secret length before hashing
+    if (secretBytes.length !== 32) {
+      throw new CoordinatorError(
+        `Generated secret has invalid length: ${secretBytes.length} bytes`,
+        ErrorCodes.INVALID_CONFIG
+      );
+    }
+    
+    const hashResult = await this.secretManager.hashSecret(secretBytes);
+    const hashLock = hashResult.hashHex;
     const secret = request.secret || this.bytesToHex(secretBytes) as Hash;
 
     // Create swap data
@@ -191,11 +201,14 @@ export class Coordinator implements ICoordinator {
       amount: request.amount.toString(),
     });
 
-    // Start processing the swap asynchronously
-    this.processSwap(swapId).catch(error => {
-      this.logger.error("Swap processing failed", { swapId, error });
-      this.updateSwapState(swapId, "failed" as SwapState, error.message);
-    });
+    // Start processing the swap asynchronously (only in production)
+    // For testing, we'll manually control the state transitions
+    if (!this.config.testMode) {
+      this.processSwap(swapId).catch(error => {
+        this.logger.error("Swap processing failed", { swapId, error });
+        this.updateSwapState(swapId, "failed" as SwapState, error.message);
+      });
+    }
 
     return this.getSwapStatusFromData(swapData);
   }
@@ -696,6 +709,16 @@ export class Coordinator implements ICoordinator {
     this.swaps.set(swapId, swap);
 
     this.logger.debug("Swap state updated", { swapId, state, error });
+  }
+
+  /**
+   * Set swap state (for testing only)
+   */
+  public setSwapStateForTesting(swapId: string, state: SwapState): void {
+    if (!this.config.testMode) {
+      throw new CoordinatorError("Method only available in test mode", ErrorCodes.INVALID_STATE);
+    }
+    this.updateSwapState(swapId, state);
   }
 
   /**

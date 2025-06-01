@@ -181,6 +181,8 @@ export interface CoordinatorConfig {
     /** Maximum concurrent swaps */
     maxConcurrentSwaps?: number;
   };
+  /** Test mode - disables async processing */
+  testMode?: boolean;
 }
 
 /**

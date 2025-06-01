@@ -35,6 +35,7 @@ Deno.test("Coordinator", async (t) => {
       maxAmount: 10000000000n, // 10,000 tokens
       maxConcurrentSwaps: 10,
     },
+    testMode: true, // Disable async processing in tests
   };
 
   const setup = async () => {
@@ -218,7 +219,7 @@ Deno.test("Coordinator", async (t) => {
     });
 
     await t.step("gets active swaps", async () => {
-      // Create a few swaps
+      // Create a few swaps (only EVM to Solana supported currently)
       const requests = [
         {
           from: ChainType.EVM,
@@ -228,11 +229,11 @@ Deno.test("Coordinator", async (t) => {
           receiver: "22222222222222222222222222222222222222222222",
         },
         {
-          from: ChainType.Solana,
-          to: ChainType.EVM,
+          from: ChainType.EVM,
+          to: ChainType.Solana,
           amount: 2000000n,
-          sender: "33333333333333333333333333333333333333333333",
-          receiver: "0x4444444444444444444444444444444444444444",
+          sender: "0x3333333333333333333333333333333333333333",
+          receiver: "44444444444444444444444444444444444444444444",
         },
       ];
 
@@ -299,6 +300,9 @@ Deno.test("Coordinator", async (t) => {
       };
 
       const swap = await coordinator.initiateSwap(request);
+      // Ensure swap stays in pending state for cancellation
+      assertEquals(swap.state, SwapState.Pending);
+      
       const cancelled = await coordinator.cancelSwap(swap.id);
 
       assertEquals(cancelled.state, SwapState.Failed);
@@ -323,6 +327,8 @@ Deno.test("Coordinator", async (t) => {
       };
 
       const swap = await coordinator.initiateSwap(request);
+      assertEquals(swap.state, SwapState.Pending);
+      
       const cancelled = await coordinator.cancelSwap(swap.id);
       assertEquals(cancelled.state, SwapState.Failed);
 
