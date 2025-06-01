@@ -4,7 +4,6 @@
 - **Project**: Bridge-less HTLC coordinator CLI for EVM ↔ Solana swaps
 - **Status**: Phase 1-3 COMPLETE ✅ | Phase 4 Ready for Implementation
 - **Test Status**: ALL 158 TESTS PASSING ✅
-- **Repository**: `/Users/bioharz/git/2025/ethglobal/prague/1inch/bridge-less/bl-cli/`
 
 ## Phase 1: Foundation ✅ COMPLETED
 - [x] Project setup with Deno configuration
