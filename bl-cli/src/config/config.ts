@@ -24,6 +24,7 @@ export class ConfigManager implements IConfigManager {
       userPrivateKey: this.getRequiredEnv("evm_user_private_key"),
       tokenContractAddress: this.getRequiredEnv("evm_token_contract_address"),
       htlcContractAddress: this.getRequiredEnv("evm_htlc_contract_address"),
+      chainId: Deno.env.get("evm_chain_id") ? parseInt(Deno.env.get("evm_chain_id")!) : undefined,
     };
 
     // Load SVM config (all optional for now)
