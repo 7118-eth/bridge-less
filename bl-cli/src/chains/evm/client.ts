@@ -228,11 +228,6 @@ export class EvmClient implements IEvmClient {
   }
 
   async getBlockNumber(): Promise<bigint> {
-    // Mock for testing
-    if (this.publicClient.transport.url?.includes("localhost:8545")) {
-      return 1000n;
-    }
-    
     return retry(
       async () => {
         const blockNumber = await this.publicClient.getBlockNumber();
