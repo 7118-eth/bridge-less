@@ -5,7 +5,10 @@ pub mod events;
 pub mod instructions;
 pub mod state;
 
+use errors::*;
+use events::*;
 use instructions::*;
+use state::*;
 
 declare_id!("5dkHPRP7JU8k8rPScNLX6eG8vLhtMvciFjKxAsDqzBcL");
 

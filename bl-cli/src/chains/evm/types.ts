@@ -24,13 +24,19 @@ export type PrivateKey = `0x${string}`;
  * Custom error class for EVM-related errors
  */
 export class EvmError extends Error {
+  public readonly code: string;
+  
   constructor(
     message: string,
-    public readonly code: string,
-    public readonly cause?: unknown
+    code: string,
+    cause?: unknown
   ) {
     super(message);
     this.name = "EvmError";
+    this.code = code;
+    if (cause) {
+      this.cause = cause;
+    }
   }
 }
 
