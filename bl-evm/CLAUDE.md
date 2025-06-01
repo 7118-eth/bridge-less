@@ -49,99 +49,140 @@ Building a trustless bridge between EVM and Solana using Hashed Timelock Contrac
 
 ### Core Design Decisions
 
-#### Contract Architecture: Mapping-Based Approach
-Using a single `HTLCEscrow` contract with mappings for gas efficiency and simplicity:
-- Each HTLC stored in a mapping with unique ID
-- ID generation: `keccak256(abi.encodePacked(sender, recipient, amount, token, hashlock, nonce))`
-- Supports multiple concurrent HTLCs
-- More gas-efficient than factory pattern for high-volume bridge
+#### Contract Architecture: Factory Pattern (Proof of Concept)
+Using a factory pattern for better isolation and security in our proof of concept:
+- Each HTLC is deployed as a separate contract
+- Factory maintains registry of all deployed HTLCs
+- Better debugging and state isolation
+- Higher gas costs acceptable for PoC phase
 
 #### Key Components
 
-1. **HTLCEscrow.sol** - Main contract
+1. **HTLCFactory.sol** - Factory contract that deploys and tracks HTLCs
    ```solidity
-   struct HTLC {
-       address sender;          // Liquidity provider on EVM side
-       bytes32 recipient;       // Solana address (e.g., DbDa7MHwnNkxZrbQY8qtfhfAGUzBSapLGbafDFwD9Z5X)
-       address token;           // ERC20 token address
-       uint256 amount;          // Token amount
-       bytes32 hashlock;        // SHA256 hash of the secret
-       uint256 timelock;        // Unix timestamp for refund eligibility
-       bool withdrawn;          // Claimed/refunded flag
-       bool refunded;           // Track if refunded
-   }
+   // Factory state
+   mapping(address => address[]) public userHTLCs;  // Track HTLCs by creator
+   mapping(bytes32 => address) public htlcRegistry; // Map ID to HTLC contract
+   address[] public allHTLCs;                       // All deployed HTLCs
+   
+   // Main function
+   function createHTLC(
+       bytes32 recipient,      // Solana address
+       address token,          // ERC20 token
+       uint256 amount,         // Token amount
+       bytes32 hashlock,       // SHA256 hash
+       uint256 timelock        // Unix timestamp
+   ) external returns (address htlcContract, bytes32 htlcId);
    ```
 
-2. **Core Functions**
-   - `createHTLC(bytes32 recipient, address token, uint256 amount, bytes32 hashlock, uint256 timelock)`
-   - `claimHTLC(bytes32 htlcId, bytes32 preimage)`
-   - `refundHTLC(bytes32 htlcId)`
-   - `getHTLC(bytes32 htlcId)` - View function
+2. **HTLC.sol** - Individual HTLC contract
+   ```solidity
+   // Immutable state (set in constructor)
+   address public immutable factory;
+   address public immutable sender;
+   bytes32 public immutable recipient;  // Solana address
+   address public immutable token;
+   uint256 public immutable amount;
+   bytes32 public immutable hashlock;
+   uint256 public immutable timelock;
+   
+   // Mutable state
+   bool public withdrawn;
+   bool public refunded;
+   
+   // Core functions
+   function claim(bytes32 preimage) external;
+   function refund() external;
+   ```
 
 3. **Events for Coordinator**
    ```solidity
-   event HTLCCreated(
+   // Factory events
+   event HTLCDeployed(
+       address indexed htlcContract,
        bytes32 indexed htlcId,
        address indexed sender,
-       bytes32 indexed recipient,
+       bytes32 recipient,
        address token,
        uint256 amount,
        bytes32 hashlock,
        uint256 timelock
    );
    
+   // HTLC contract events
    event HTLCClaimed(
-       bytes32 indexed htlcId,
+       address indexed htlcContract,
        bytes32 preimage,
        address claimant
    );
    
    event HTLCRefunded(
-       bytes32 indexed htlcId,
+       address indexed htlcContract,
        address sender
    );
    ```
 
+4. **HTLC ID Generation**
+   - `htlcId = keccak256(abi.encodePacked(sender, recipient, token, amount, hashlock, timelock, block.timestamp))`
+   - Used for cross-chain coordination
+   - Stored in factory registry
+
 ### Security Considerations
 - Use SHA256 for cross-chain compatibility (Solana native)
-- Reentrancy guards on all state-changing functions
+- Factory-only deployment (HTLCs can only be created through factory)
+- Immutable HTLC parameters prevent tampering
 - Check-Effects-Interactions pattern for token transfers
 - Validate hashlock matches SHA256(preimage) on claim
 - Enforce timelock strictly (no early refunds)
 - SafeTransferFrom for ERC20 operations
+- Factory cannot interfere with individual HTLC operations
+- Each HTLC holds tokens directly (no central pool)
 
 ### Testing Strategy
 
-1. **Unit Tests** (`test/HTLCEscrow.t.sol`)
-   - Test HTLC creation with valid parameters
+1. **Factory Tests** (`test/HTLCFactory.t.sol`)
+   - Test factory deployment
+   - Test HTLC contract deployment through factory
+   - Test registry functions (getUserHTLCs, getHTLC)
+   - Test event emissions on deployment
+   - Test multiple HTLC deployments
+   - Verify factory cannot interfere with HTLCs
+
+2. **HTLC Contract Tests** (`test/HTLC.t.sol`)
+   - Test HTLC initialization with correct parameters
    - Test claiming with correct preimage
    - Test claiming with incorrect preimage (should fail)
    - Test refund after timelock expires
    - Test refund before timelock (should fail)
    - Test double-claim prevention
    - Test double-refund prevention
-   - Test with multiple HTLCs concurrently
    - Test with 10k token amounts (as specified)
+   - Test only sender can refund
+   - Test anyone can claim with correct preimage
 
-2. **Integration Tests**
-   - Test with actual Token.sol contract
-   - Simulate bridge scenario with multiple HTLCs
-   - Gas optimization tests
+3. **Integration Tests** (`test/HTLCBridge.t.sol`)
+   - Test end-to-end flow with Token.sol
+   - Deploy multiple HTLCs through factory
+   - Simulate bridge scenario with concurrent HTLCs
+   - Test coordinator event tracking
+   - Gas usage analysis
 
-3. **Edge Cases**
-   - Zero amount HTLCs
-   - Past timelock on creation
+4. **Edge Cases**
+   - Zero amount HTLCs (should revert)
+   - Past timelock on creation (should revert)
    - Extremely large amounts
-   - Hash collision scenarios (theoretical)
+   - Invalid token addresses
+   - Factory registry overflow scenarios
 
 ### Implementation Timeline
-1. Create `HTLCEscrow.sol` with core structure
-2. Implement state variables and mappings
-3. Add createHTLC function with proper validations
-4. Add claim and refund logic with security checks
-5. Write comprehensive test suite
-6. Add natspec documentation
-7. Gas optimization pass
+1. Create `HTLC.sol` contract with immutable state
+2. Implement claim and refund functions with security checks
+3. Create `HTLCFactory.sol` with deployment logic
+4. Implement factory registry and tracking functions
+5. Write comprehensive test suite for both contracts
+6. Test integration with existing Token.sol
+7. Add natspec documentation
+8. Verify gas costs are acceptable for PoC
 
 ### Production Considerations
 - 10-minute recovery timer (600 seconds) for testing
@@ -151,7 +192,16 @@ Using a single `HTLCEscrow` contract with mappings for gas efficiency and simpli
 - Monitor for front-running on claims
 
 ### Coordinator Integration Points
-- Listen to HTLCCreated events to trigger Solana-side creation
-- Monitor HTLCClaimed events to release funds on opposite chain
+- Listen to HTLCDeployed events from factory to trigger Solana-side creation
+- Store mapping of htlcId to contract address for tracking
+- Monitor HTLCClaimed events from individual HTLC contracts
 - Track HTLCRefunded events for liquidity management
 - Use htlcId as cross-chain identifier
+- Query factory for active HTLCs via getUserHTLCs and htlcRegistry
+
+### Additional Factory Pattern Considerations
+- Gas cost for deployment: ~500k-1M gas per HTLC (acceptable for PoC)
+- Each HTLC is independent - failure of one doesn't affect others
+- Factory upgrade path: deploy new factory, migrate coordinator
+- Consider using CREATE2 for deterministic addresses (optional)
+- HTLCs are minimal - only essential functions to reduce deployment cost
