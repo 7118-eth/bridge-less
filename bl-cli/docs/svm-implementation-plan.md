@@ -1,8 +1,12 @@
 # SVM Implementation Plan
 
+> **Note**: This plan has been implemented. See [svm-implementation-status.md](./svm-implementation-status.md) for current status and details.
+
 ## Overview
 
 Based on the IDL analysis and Anza Kit documentation, here's a comprehensive plan for implementing Solana integration in the bl-cli project.
+
+**Update (Dec 6, 2025)**: Implementation complete using @solana/web3.js v1.95 instead of Anza Kit for better stability.
 
 ## Contract Analysis
 
@@ -244,3 +248,45 @@ Already configured in .env:
 4. **Permissions**: May need `--allow-net` for npm registry access
 
 This plan provides a clear path from the current mock implementation to a fully functional Solana integration using modern tooling with Deno.
+
+## Implementation Notes (December 2025)
+
+### What Changed from Plan
+
+1. **Library Choice**: Used @solana/web3.js v1.95 instead of Anza Kit
+   - Better documentation and stability
+   - Wider ecosystem support
+   - Anza Kit is still experimental
+
+2. **Import Strategy**: 
+   ```typescript
+   // Plan suggested:
+   import { createSolanaRpc } from "npm:@solana/kit";
+   
+   // Actually used:
+   import { Connection, PublicKey, Keypair } from "npm:@solana/web3.js@1.95";
+   ```
+
+3. **Buffer Handling**: Replaced all Buffer usage with Uint8Array
+   ```typescript
+   // Instead of:
+   Buffer.from("htlc")
+   
+   // Used:
+   new TextEncoder().encode("htlc")
+   ```
+
+4. **Dynamic Imports**: Made Solana optional for graceful degradation
+   ```typescript
+   try {
+     const { SolanaClient } = await import("./src/chains/solana/index.ts");
+   } catch (error) {
+     logger.warn("Continuing in EVM-only mode");
+   }
+   ```
+
+5. **WebSocket Issue**: @solana/web3.js requires 'ws' module not available in Deno
+   - System continues to work in "EVM-only mode"
+   - Full functionality available once ws dependency resolved
+
+See [svm-implementation-status.md](./svm-implementation-status.md) for complete implementation details.
