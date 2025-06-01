@@ -40,6 +40,31 @@ Tests inherit from `forge-std/Test.sol` and use:
 - `vm.expectRevert()` for failure testing
 - Standard assertions (`assertTrue`, `assertEq`)
 
+**Development Process (mandatory for this project):**
+
+1. **Interface-First Development:**
+   - ALWAYS create interfaces FIRST before any implementation
+   - Define all public functions, events, and errors in the interface
+   - Use comprehensive NatSpec documentation on interfaces
+   - Interfaces should be in `src/interfaces/` directory
+
+2. **Test-Driven Development (TDD):**
+   - Write tests based on interfaces BEFORE implementation
+   - Run tests to see them fail (red phase)
+   - Write minimal code to make tests pass (green phase)
+   - Refactor while keeping tests green
+   - Run `forge test` after every change to ensure nothing breaks
+
+3. **Documentation Requirements:**
+   - Use Ethereum Natural Specification Format (NatSpec) for ALL contracts and interfaces
+   - Document every function with:
+     - `@notice` - Explain what the function does
+     - `@dev` - Technical details for developers
+     - `@param` - Document each parameter
+     - `@return` - Document return values
+   - Document every event and error with `@notice`
+   - Document contract/interface level with `@title`, `@author`, and `@notice`
+
 The project appears to be part of a "bridge-less" solution for 1inch protocol, currently in early development with basic ERC20 token infrastructure.
 
 ## HTLC Bridge Implementation Plan
