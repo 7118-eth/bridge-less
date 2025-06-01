@@ -106,6 +106,12 @@ Tests use Deno's built-in test runner:
    - Document error cases with `@throws`
    - Keep inline comments minimal and meaningful
 
+4. **Version Control:**
+   - Commit after EVERY completed step
+   - Use clear, descriptive commit messages
+   - Only stage files in the bl-cli directory
+   - Keep commits atomic and focused
+
 ## Core Components
 
 ### 1. Coordinator Service
@@ -156,10 +162,18 @@ const secret = crypto.getRandomValues(new Uint8Array(32));
 ```typescript
 // Read from .env automatically
 const config = {
-  evmRpcUrl: Deno.env.get("EVM_RPC_URL") || "http://localhost:8545",
-  evmPrivateKey: Deno.env.get("EVM_PRIVATE_KEY")!,
-  solanaRpcUrl: Deno.env.get("SOLANA_RPC_URL") || "http://localhost:8899",
-  // ... more config
+  evmRpc: Deno.env.get("evm_rpc") || "http://localhost:8545",
+  evmRpcWs: Deno.env.get("evm_rpc_ws") || "ws://localhost:8545",
+  evmCoordinatorPrivateKey: Deno.env.get("evm_coordinator_private_key")!,
+  evmUserPrivateKey: Deno.env.get("evm_user_private_key")!,
+  evmTokenContractAddress: Deno.env.get("evm_token_contract_address")!,
+  evmHtlcContractAddress: Deno.env.get("evm_htlc_contract_address")!,
+  svmRpc: Deno.env.get("svm_rpc") || "http://localhost:8899",
+  svmRpcWs: Deno.env.get("svm_rpc_ws") || "ws://localhost:8900",
+  svmCoordinatorPrivateKey: Deno.env.get("svm_coordinator_private_key"),
+  svmUserPrivateKey: Deno.env.get("svm_user_private_key"),
+  svmTokenContractAddress: Deno.env.get("svm_token_contract_address"),
+  svmHtlcContractAddress: Deno.env.get("svm_htlc_contract_address"),
 };
 ```
 
@@ -330,7 +344,7 @@ deno compile --allow-net --allow-env --allow-read -o bl-cli main.ts
 ## Current Implementation Status
 
 ### Phase 1: Foundation (Current Focus)
-- [ ] Project setup with Deno configuration
+- [x] Project setup with Deno configuration
 - [ ] Basic types and interfaces definition
 - [ ] Cryptographic utilities with tests
 - [ ] Configuration management
@@ -367,5 +381,6 @@ Note: Solana integration is deferred as the SVM contracts are not yet implemente
    - Resolver exclusive: 60 seconds
    - Public withdrawal: 300 seconds
    - Cancellation: 600 seconds
+6. **Local EVM Contracts**: Token and HTLC contracts are already deployed on local testnet (see .env)
 
 This implementation demonstrates the core HTLC bridge concept while keeping complexity manageable for a proof of concept.
