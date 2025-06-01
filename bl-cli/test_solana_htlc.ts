@@ -1,6 +1,5 @@
 import { Keypair, Connection, PublicKey } from 'npm:@solana/web3.js@1.95';
-import { SolanaClient } from './src/chains/solana/client.ts';
-import { SolanaHTLCManager } from './src/chains/solana/htlc.ts';
+import { SolanaClient, SolanaHTLCManager } from './src/chains/solana/index.ts';
 import { createLogger } from './src/utils/logger.ts';
 
 const bs58 = await import('npm:bs58@5');
@@ -25,8 +24,7 @@ const logger = createLogger({ level: 'debug' });
 const client = new SolanaClient({
   rpcUrl,
   commitment: 'confirmed',
-  logger: logger.child({ module: 'solana-client' }),
-});
+}, logger.child({ module: 'solana-client' }));
 
 const htlcManager = new SolanaHTLCManager({
   client,

@@ -1,96 +1,53 @@
 /**
- * Solana client implementation using Solana Kit
+ * Solana client implementation using Anza Kit
  */
 
 import {
-  createSolanaRpc,
-  createSolanaRpcSubscriptions,
-  address,
-  createTransactionMessage,
-  setTransactionMessageFeePayer,
-  setTransactionMessageLifetimeUsingBlockhash,
-  appendTransactionMessageInstruction,
-  signTransactionMessageWithSigners,
-  sendAndConfirmTransactionFactory,
-  getBase58Decoder,
-  getBase58Encoder,
-  getBase64Encoder,
-  getBase64Decoder,
-  signature,
-} from "npm:@solana/kit@2.1.1";
-
-import type {
-  Signature,
-  Address,
-  TransactionSigner,
-  CompilableTransactionMessage,
-  Rpc,
-  RpcSubscriptions,
-  GetBalanceApi,
-  GetBlockTimeApi,
-  GetSlotApi,
-  GetTransactionApi,
-  GetAccountInfoApi,
-  GetLatestBlockhashApi,
-  SendTransactionApi,
-} from "npm:@solana/kit@2.1.1";
-
+  Connection,
+  PublicKey,
+  Keypair,
+  Transaction,
+  sendAndConfirmTransaction,
+  LAMPORTS_PER_SOL,
+} from "npm:@solana/web3.js@1.95";
 import type {
   ISolanaClient,
   SolanaClientConfig,
   TransactionConfirmation,
   TransactionDetails,
   LogEvent,
-  SignedTransaction,
 } from "./types.ts";
 import { SolanaError, SolanaErrorCode } from "./types.ts";
 import { Logger } from "../../utils/logger.ts";
 import { retry } from "../../utils/retry.ts";
 
-// Import web3.js Connection for compatibility
-import { Connection } from "npm:@solana/web3.js@1.95";
-
 /**
- * Solana client implementation using Kit
+ * Solana client implementation
  */
-export class SolanaClientKit implements ISolanaClient {
-  private rpc: ReturnType<typeof createSolanaRpc>;
-  private rpcSubscriptions?: ReturnType<typeof createSolanaRpcSubscriptions>;
+export class SolanaClient implements ISolanaClient {
+  private connection: Connection;
   private config: SolanaClientConfig;
   private logger: Logger;
   private isConnected: boolean = false;
-  private base58Decoder = getBase58Decoder();
-  private base58Encoder = getBase58Encoder();
-  
-  // For compatibility with web3.js code
-  public connection: any;
 
   constructor(config: SolanaClientConfig, logger?: Logger) {
     this.config = {
       commitment: "confirmed",
       ...config,
     };
-    this.logger = logger || new Logger("solana-client-kit");
+    this.logger = logger || new Logger("solana-client");
     
-    // Create Kit RPC client
-    this.rpc = createSolanaRpc(config.rpcUrl);
-    
-    // Create WebSocket subscriptions if URL provided
-    if (config.rpcWsUrl) {
-      this.rpcSubscriptions = createSolanaRpcSubscriptions(config.rpcWsUrl);
-    }
-    
-    // Create web3.js Connection for compatibility
+    // Create web3.js Connection
     this.connection = new Connection(config.rpcUrl, this.config.commitment);
   }
 
   async connect(): Promise<void> {
     try {
       // Test connection by getting latest blockhash
-      const blockhashResult = await this.rpc.getLatestBlockhash().send();
-      this.logger.info("Connected to Solana via Kit", { 
+      const { blockhash } = await this.connection.getLatestBlockhash();
+      this.logger.info("Connected to Solana", { 
         rpcUrl: this.config.rpcUrl,
-        blockhash: blockhashResult.value.blockhash,
+        blockhash,
       });
       this.isConnected = true;
     } catch (error) {
@@ -107,16 +64,14 @@ export class SolanaClientKit implements ISolanaClient {
     this.logger.info("Disconnected from Solana");
   }
 
-  async getBalance(addressStr: string): Promise<bigint> {
+  async getBalance(address: string): Promise<bigint> {
     try {
-      const addr = address(addressStr);
-      const result = await this.rpc.getBalance(addr, {
-        commitment: this.config.commitment,
-      }).send();
-      return BigInt(result.value);
+      const pubkey = new PublicKey(address);
+      const balance = await this.connection.getBalance(pubkey);
+      return BigInt(balance);
     } catch (error) {
       throw new SolanaError(
-        `Failed to get balance for ${addressStr}`,
+        `Failed to get balance for ${address}`,
         SolanaErrorCode.CONNECTION_FAILED,
         error
       );
@@ -125,37 +80,26 @@ export class SolanaClientKit implements ISolanaClient {
 
   async getTokenBalance(tokenMint: string, owner: string): Promise<bigint> {
     try {
-      const mintAddr = address(tokenMint);
-      const ownerAddr = address(owner);
-      
-      // Get associated token account using SPL token
-      const { getAssociatedTokenAddress } = await import("npm:@solana/spl-token@0.3");
-      
-      // Convert addresses for compatibility
-      const { PublicKey } = await import("npm:@solana/web3.js@1.95");
       const mintPubkey = new PublicKey(tokenMint);
       const ownerPubkey = new PublicKey(owner);
+      
+      // Get associated token account
+      const { getAssociatedTokenAddress } = await import("npm:@solana/spl-token@0.3");
       
       const ataAddress = await getAssociatedTokenAddress(
         mintPubkey,
         ownerPubkey
       );
       
-      // Get account info
-      const accountInfo = await this.rpc.getAccountInfo(
-        address(ataAddress.toBase58()),
-        { encoding: "base64", commitment: this.config.commitment }
-      ).send();
-      
-      if (!accountInfo.value) {
+      // Get token account info
+      const accountInfo = await this.connection.getAccountInfo(ataAddress);
+      if (!accountInfo) {
         return 0n; // No token account means 0 balance
       }
       
       // Parse token account data
       const { AccountLayout } = await import("npm:@solana/spl-token@0.3");
-      const data = AccountLayout.decode(
-        Buffer.from(accountInfo.value.data[0], accountInfo.value.data[1] as any)
-      );
+      const data = AccountLayout.decode(accountInfo.data);
       
       return BigInt(data.amount.toString());
     } catch (error) {
@@ -173,14 +117,14 @@ export class SolanaClientKit implements ISolanaClient {
 
   async sendTransaction(transaction: any): Promise<string> {
     try {
-      // For compatibility, we'll use the old web3.js transaction
-      // The transaction should already be signed
+      // Transaction should be a web3.js Transaction
+      const tx = transaction as Transaction;
       
       // Send with retry logic
-      const sig = await retry(
+      const signature = await retry(
         async () => {
-          // For now, use the web3.js connection directly
-          return await this.connection.sendRawTransaction(transaction.serialize(), {
+          // Transaction should already be signed, so we use sendRawTransaction
+          return await this.connection.sendRawTransaction(tx.serialize(), {
             skipPreflight: false,
             preflightCommitment: this.config.commitment,
           });
@@ -189,8 +133,8 @@ export class SolanaClientKit implements ISolanaClient {
         { initialDelay: 1000, maxDelay: 5000 }
       );
       
-      this.logger.info("Transaction sent", { signature: sig });
-      return sig;
+      this.logger.info("Transaction sent", { signature });
+      return signature;
     } catch (error) {
       throw new SolanaError(
         "Failed to send transaction",
@@ -202,7 +146,6 @@ export class SolanaClientKit implements ISolanaClient {
 
   async waitForTransaction(signature: string): Promise<TransactionConfirmation> {
     try {
-      // Use web3.js connection for compatibility
       const result = await this.connection.confirmTransaction(
         signature,
         this.config.commitment
@@ -239,13 +182,10 @@ export class SolanaClientKit implements ISolanaClient {
 
   async getTransaction(signature: string): Promise<TransactionDetails | null> {
     try {
-      const tx = await this.rpc.getTransaction(
-        signature as Signature,
-        {
-          commitment: this.config.commitment,
-          maxSupportedTransactionVersion: 0,
-        }
-      ).send();
+      const tx = await this.connection.getTransaction(signature, {
+        commitment: this.config.commitment,
+        maxSupportedTransactionVersion: 0,
+      });
       
       if (!tx) {
         return null;
@@ -282,28 +222,24 @@ export class SolanaClientKit implements ISolanaClient {
     }
     
     try {
-      const programAddr = address(programId);
+      const pubkey = new PublicKey(programId);
       
-      // Subscribe to logs
-      const subscription = this.rpcSubscriptions.logsSubscribe(
-        { mentions: [programAddr] },
-        { commitment: this.config.commitment }
-      ).subscribe({
-        next: (notification) => {
+      // Use web3.js subscription for now
+      const subscriptionId = this.connection.onLogs(
+        pubkey,
+        (logs) => {
           callback({
-            signature: notification.value.signature,
-            err: notification.value.err,
-            logs: notification.value.logs,
+            signature: logs.signature,
+            err: logs.err,
+            logs: logs.logs,
           });
         },
-        error: (error) => {
-          this.logger.error("Log subscription error", error);
-        },
-      });
+        this.config.commitment
+      );
       
       // Return unsubscribe function
       return () => {
-        subscription.unsubscribe();
+        this.connection.removeOnLogsListener(subscriptionId);
       };
     } catch (error) {
       throw new SolanaError(
@@ -316,8 +252,7 @@ export class SolanaClientKit implements ISolanaClient {
 
   async getSlot(): Promise<number> {
     try {
-      const result = await this.rpc.getSlot().send();
-      return result;
+      return await this.connection.getSlot();
     } catch (error) {
       throw new SolanaError(
         "Failed to get slot",
@@ -330,8 +265,8 @@ export class SolanaClientKit implements ISolanaClient {
   async getBlockTime(): Promise<number> {
     try {
       const slot = await this.getSlot();
-      const result = await this.rpc.getBlockTime(slot).send();
-      return result || Math.floor(Date.now() / 1000);
+      const blockTime = await this.connection.getBlockTime(slot);
+      return blockTime || Math.floor(Date.now() / 1000);
     } catch (error) {
       throw new SolanaError(
         "Failed to get block time",

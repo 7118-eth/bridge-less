@@ -2,15 +2,27 @@
  * Type definitions for Solana chain integration
  */
 
-// Re-export common types from web3.js that we'll use
+// Import types from Solana Kit
+import type {
+  Address,
+  TransactionSigner,
+  IInstruction,
+  TransactionMessage,
+  SignedTransaction,
+  Rpc,
+  RpcSubscriptions,
+  Signature,
+} from "npm:@solana/kit@2.1.1";
+
+// Export Kit types for use in other modules
 export type {
-  PublicKey,
-  Keypair,
-  Transaction,
-  TransactionInstruction,
-  TransactionSignature,
-  Connection,
-} from "npm:@solana/web3.js@1.95";
+  Address,
+  TransactionSigner,
+  IInstruction,
+  TransactionMessage,
+  SignedTransaction,
+  Signature,
+};
 
 /**
  * Transaction confirmation details
@@ -89,7 +101,7 @@ export interface ISolanaClient {
    * @param transaction - Signed transaction
    * @returns Transaction signature
    */
-  sendTransaction(transaction: Transaction): Promise<string>;
+  sendTransaction(transaction: SignedTransaction): Promise<string>;
 
   /**
    * Wait for transaction confirmation

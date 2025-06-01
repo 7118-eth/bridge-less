@@ -5,7 +5,7 @@
 import { assertEquals, assertExists } from "jsr:@std/assert@1";
 import { Keypair } from "npm:@solana/web3.js@1.95";
 import { MockSolanaClient } from "./mock_client.ts";
-import { SolanaHTLCManager } from "./htlc.ts";
+import { SolanaHTLCManagerKit as SolanaHTLCManager } from "./htlc.ts";
 import { HTLCEventType } from "./types.ts";
 import type { SolanaHTLCEvent } from "./types.ts";
 import { Logger } from "../../utils/logger.ts";
@@ -67,12 +67,11 @@ const mockCoder = {
   },
 };
 
-// Patch the HTLCManager to use mock coder
+// For now, use the original manager directly since we're using manual encoding
 class TestableHTLCManager extends SolanaHTLCManager {
   constructor(config: any) {
     super(config);
-    // Override the coder
-    (this as any).coder = mockCoder;
+    // The Kit version uses manual encoding, so no coder override needed
   }
 }
 

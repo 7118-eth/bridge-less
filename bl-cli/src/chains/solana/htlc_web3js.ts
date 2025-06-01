@@ -1,30 +1,21 @@
 /**
- * Solana HTLC manager implementation using Solana Kit
+ * Solana HTLC manager implementation
  */
 
 import {
-  address,
-  createTransactionMessage,
-  setTransactionMessageFeePayer,
-  setTransactionMessageLifetimeUsingBlockhash,
-  appendTransactionMessageInstruction,
-  signTransactionMessageWithSigners,
-  createKeyPairSignerFromBytes,
-  getProgramDerivedAddress,
-  getBase58Encoder,
-  getBase58Decoder,
-  getStructCodec,
-  getU8Codec,
-  getU64Codec,
-  getBytesCodec,
-  getArrayCodec,
-  fixCodecSize,
-  pipe,
-  IInstruction,
-  Address,
-  TransactionSigner,
-} from "npm:@solana/kit@2.1.1";
-
+  PublicKey,
+  Keypair,
+  Transaction,
+  TransactionInstruction,
+  SystemProgram,
+  SYSVAR_CLOCK_PUBKEY,
+} from "npm:@solana/web3.js@1.95";
+import {
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+} from "npm:@solana/spl-token@0.3";
+import { BorshCoder } from "npm:@coral-xyz/anchor@0.29";
 import type {
   ISolanaHTLCManager,
   ISolanaClient,
@@ -32,29 +23,14 @@ import type {
   CreateHTLCResult,
   HTLCState,
   SolanaHTLCEvent,
+  HTLCEventType,
   HTLCCreatedEvent,
   HTLCWithdrawnEvent,
   HTLCCancelledEvent,
 } from "./types.ts";
-import { HTLCEventType } from "./types.ts";
 import { SolanaError, SolanaErrorCode } from "./types.ts";
 import { Logger } from "../../utils/logger.ts";
 import idl from "../../../idl/bl_svm.json" with { type: "json" };
-
-// For compatibility with existing code, we'll also import web3.js
-import { 
-  PublicKey,
-  Keypair,
-  Transaction,
-  TransactionInstruction,
-  SystemProgram,
-} from "npm:@solana/web3.js@1.95";
-import {
-  TOKEN_PROGRAM_ID,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  getAssociatedTokenAddress,
-} from "npm:@solana/spl-token@0.3";
-import { Buffer } from "npm:buffer@6";
 
 /**
  * Discriminators from IDL for event parsing
@@ -77,44 +53,54 @@ export interface HTLCManagerConfig {
 }
 
 /**
- * Solana HTLC manager implementation using Kit
+ * Solana HTLC manager implementation
  */
-export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
+export class SolanaHTLCManager implements ISolanaHTLCManager {
   private client: ISolanaClient & { connection: any };
   private programId: PublicKey;
-  private programAddress: Address;
   private tokenMint: PublicKey;
-  private tokenMintAddress: Address;
   private keypair: Keypair;
   private logger: Logger;
-  private base58Encoder = getBase58Encoder();
-  private base58Decoder = getBase58Decoder();
+  private coder: BorshCoder;
 
   constructor(config: HTLCManagerConfig) {
     this.client = config.client as ISolanaClient & { connection: any };
     this.programId = new PublicKey(config.programId);
-    this.programAddress = address(config.programId);
     this.tokenMint = new PublicKey(config.tokenMint);
-    this.tokenMintAddress = address(config.tokenMint);
     this.keypair = config.keypair;
-    this.logger = config.logger || new Logger({ name: "solana-htlc-kit" });
+    this.logger = config.logger || new Logger("solana-htlc");
     
-    // Create signer from keypair (async in Kit)
-    // We'll create it when needed
+    // Initialize Anchor coder for event parsing
+    try {
+      this.coder = new BorshCoder(idl as any);
+    } catch (error) {
+      this.logger.warn("Failed to initialize BorshCoder, some features may be limited", { error: error.message });
+      // Create a mock coder that throws to force manual encoding
+      this.coder = {
+        instruction: {
+          encode: (name: string, data: any) => {
+            throw new Error("Mock coder - use manual encoding");
+          }
+        },
+        accounts: {
+          decode: (name: string, data: Buffer) => ({})
+        },
+        events: {
+          decode: (data: Buffer) => null
+        }
+      } as any;
+    }
   }
 
   async createHTLC(params: CreateHTLCParams): Promise<CreateHTLCResult> {
     try {
-      // For now, we'll use the hybrid approach - Kit for some things, web3.js for others
-      // This is because the full migration would require rewriting everything
-      
-      // Derive HTLC PDA using web3.js (easier for now)
+      // Derive HTLC PDA
       const [htlcPda, bump] = PublicKey.findProgramAddressSync(
         [new TextEncoder().encode("htlc"), params.htlcId],
         this.programId
       );
       
-      this.logger.info("Creating HTLC with Kit hybrid", {
+      this.logger.info("Creating HTLC", {
         htlcId: Array.from(params.htlcId, b => b.toString(16).padStart(2, '0')).join(''),
         htlcPda: htlcPda.toBase58(),
       });
@@ -135,70 +121,96 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
         ASSOCIATED_TOKEN_PROGRAM_ID
       );
       
-      // Build instruction data using manual encoding (same as before)
-      const discriminator = new Uint8Array([217, 24, 248, 19, 247, 183, 68, 88]);
-      const data = new Uint8Array(8 + 32 + 20 + 20 + 8 + 8 + 32 + 8 + 8 + 8 + 8);
-      let offset = 0;
+      // Build instruction data
+      let instructionData: Uint8Array;
+      try {
+        instructionData = this.coder.instruction.encode("create_htlc", {
+          params: {
+            htlc_id: Array.from(params.htlcId),
+            dst_address: Array.from(params.destinationAddress),
+            dst_token: Array.from(params.destinationToken),
+            amount: params.amount.toString(),
+            safety_deposit: params.safetyDeposit.toString(),
+            hashlock: Array.from(params.hashlock),
+            finality_deadline: params.timelocks.finality,
+            resolver_deadline: params.timelocks.resolver,
+            public_deadline: params.timelocks.public,
+            cancellation_deadline: params.timelocks.cancellation,
+          },
+        });
+      } catch (error) {
+        // Fallback: manually construct the instruction data
+        this.logger.warn("Using fallback instruction encoding");
+        
+        // Discriminator for create_htlc: [217, 24, 248, 19, 247, 183, 68, 88]
+        const discriminator = new Uint8Array([217, 24, 248, 19, 247, 183, 68, 88]);
+        
+        // Manually encode the parameters (simplified version)
+        const data = new Uint8Array(8 + 32 + 20 + 20 + 8 + 8 + 32 + 8 + 8 + 8 + 8);
+        let offset = 0;
+        
+        // Discriminator
+        data.set(discriminator, offset);
+        offset += 8;
+        
+        // htlc_id
+        data.set(params.htlcId, offset);
+        offset += 32;
+        
+        // dst_address
+        data.set(params.destinationAddress, offset);
+        offset += 20;
+        
+        // dst_token
+        data.set(params.destinationToken, offset);
+        offset += 20;
+        
+        // amount (u64 - little endian)
+        const amountBytes = new Uint8Array(8);
+        const amountView = new DataView(amountBytes.buffer);
+        amountView.setBigUint64(0, params.amount, true);
+        data.set(amountBytes, offset);
+        offset += 8;
+        
+        // safety_deposit (u64 - little endian)
+        const safetyBytes = new Uint8Array(8);
+        const safetyView = new DataView(safetyBytes.buffer);
+        safetyView.setBigUint64(0, params.safetyDeposit, true);
+        data.set(safetyBytes, offset);
+        offset += 8;
+        
+        // hashlock
+        data.set(params.hashlock, offset);
+        offset += 32;
+        
+        // timestamps (i64 - little endian)
+        const finalityBytes = new Uint8Array(8);
+        const finalityView = new DataView(finalityBytes.buffer);
+        finalityView.setBigInt64(0, BigInt(params.timelocks.finality), true);
+        data.set(finalityBytes, offset);
+        offset += 8;
+        
+        const resolverBytes = new Uint8Array(8);
+        const resolverView = new DataView(resolverBytes.buffer);
+        resolverView.setBigInt64(0, BigInt(params.timelocks.resolver), true);
+        data.set(resolverBytes, offset);
+        offset += 8;
+        
+        const publicBytes = new Uint8Array(8);
+        const publicView = new DataView(publicBytes.buffer);
+        publicView.setBigInt64(0, BigInt(params.timelocks.public), true);
+        data.set(publicBytes, offset);
+        offset += 8;
+        
+        const cancelBytes = new Uint8Array(8);
+        const cancelView = new DataView(cancelBytes.buffer);
+        cancelView.setBigInt64(0, BigInt(params.timelocks.cancellation), true);
+        data.set(cancelBytes, offset);
+        
+        instructionData = data;
+      }
       
-      // Discriminator
-      data.set(discriminator, offset);
-      offset += 8;
-      
-      // htlc_id
-      data.set(params.htlcId, offset);
-      offset += 32;
-      
-      // dst_address
-      data.set(params.destinationAddress, offset);
-      offset += 20;
-      
-      // dst_token
-      data.set(params.destinationToken, offset);
-      offset += 20;
-      
-      // amount (u64 - little endian)
-      const amountBytes = new Uint8Array(8);
-      const amountView = new DataView(amountBytes.buffer);
-      amountView.setBigUint64(0, params.amount, true);
-      data.set(amountBytes, offset);
-      offset += 8;
-      
-      // safety_deposit (u64 - little endian)
-      const safetyBytes = new Uint8Array(8);
-      const safetyView = new DataView(safetyBytes.buffer);
-      safetyView.setBigUint64(0, params.safetyDeposit, true);
-      data.set(safetyBytes, offset);
-      offset += 8;
-      
-      // hashlock
-      data.set(params.hashlock, offset);
-      offset += 32;
-      
-      // timestamps (i64 - little endian)
-      const finalityBytes = new Uint8Array(8);
-      const finalityView = new DataView(finalityBytes.buffer);
-      finalityView.setBigInt64(0, BigInt(params.timelocks.finality), true);
-      data.set(finalityBytes, offset);
-      offset += 8;
-      
-      const resolverBytes = new Uint8Array(8);
-      const resolverView = new DataView(resolverBytes.buffer);
-      resolverView.setBigInt64(0, BigInt(params.timelocks.resolver), true);
-      data.set(resolverBytes, offset);
-      offset += 8;
-      
-      const publicBytes = new Uint8Array(8);
-      const publicView = new DataView(publicBytes.buffer);
-      publicView.setBigInt64(0, BigInt(params.timelocks.public), true);
-      data.set(publicBytes, offset);
-      offset += 8;
-      
-      const cancelBytes = new Uint8Array(8);
-      const cancelView = new DataView(cancelBytes.buffer);
-      cancelView.setBigInt64(0, BigInt(params.timelocks.cancellation), true);
-      data.set(cancelBytes, offset);
-      
-      // Create instruction using web3.js
+      // Create instruction
       const instruction = new TransactionInstruction({
         programId: this.programId,
         keys: [
@@ -211,10 +223,10 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
           { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         ],
-        data: Buffer.from(data),
+        data: instructionData,
       });
       
-      // Create and send transaction using web3.js (for compatibility)
+      // Create and send transaction
       const transaction = new Transaction().add(instruction);
       
       // Get recent blockhash
@@ -231,7 +243,7 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
       // Wait for confirmation
       const confirmation = await this.client.waitForTransaction(signature);
       
-      this.logger.info("HTLC created with Kit hybrid", {
+      this.logger.info("HTLC created", {
         htlcAddress: htlcPda.toBase58(),
         transactionHash: signature,
         slot: confirmation.slot,
@@ -243,7 +255,7 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
         slot: confirmation.slot,
       };
     } catch (error) {
-      this.logger.error("Failed to create HTLC", { error });
+      this.logger.error("Failed to create HTLC", error);
       throw new SolanaError(
         "Failed to create HTLC",
         SolanaErrorCode.TRANSACTION_FAILED,
@@ -285,11 +297,12 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
       );
       
       // Build instruction data
-      // Discriminator for withdraw_to_destination: [207, 12, 73, 94, 249, 225, 1, 247]
-      const discriminator = new Uint8Array([207, 12, 73, 94, 249, 225, 1, 247]);
-      const data = new Uint8Array(8 + 32);
-      data.set(discriminator, 0);
-      data.set(preimage, 8);
+      const instructionData = this.coder.instruction.encode(
+        "withdraw_to_destination",
+        {
+          preimage: Array.from(preimage),
+        }
+      );
       
       // Create instruction
       const instruction = new TransactionInstruction({
@@ -304,7 +317,7 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
           { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         ],
-        data: Buffer.from(data),
+        data: new Uint8Array(instructionData),
       });
       
       // Create and send transaction
@@ -331,7 +344,7 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
       
       return signature;
     } catch (error) {
-      this.logger.error("Failed to withdraw from HTLC", { error });
+      this.logger.error("Failed to withdraw from HTLC", error);
       throw new SolanaError(
         "Failed to withdraw from HTLC",
         SolanaErrorCode.TRANSACTION_FAILED,
@@ -378,8 +391,7 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
       );
       
       // Build instruction data
-      // Discriminator for cancel: [232, 219, 223, 41, 219, 236, 220, 190]
-      const discriminator = new Uint8Array([232, 219, 223, 41, 219, 236, 220, 190]);
+      const instructionData = this.coder.instruction.encode("cancel", {});
       
       // Create instruction
       const instruction = new TransactionInstruction({
@@ -395,7 +407,7 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
           { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         ],
-        data: Buffer.from(discriminator),
+        data: new Uint8Array(instructionData),
       });
       
       // Create and send transaction
@@ -422,7 +434,7 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
       
       return signature;
     } catch (error) {
-      this.logger.error("Failed to cancel HTLC", { error });
+      this.logger.error("Failed to cancel HTLC", error);
       throw new SolanaError(
         "Failed to cancel HTLC",
         SolanaErrorCode.TRANSACTION_FAILED,
@@ -445,86 +457,29 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
         return null;
       }
       
-      // Manually decode account data
-      // Account structure based on IDL
-      const data = accountInfo.data;
-      let offset = 8; // Skip discriminator
-      
-      // Read fields in order
-      const resolver = new PublicKey(data.slice(offset, offset + 32));
-      offset += 32;
-      
-      const srcAddress = new PublicKey(data.slice(offset, offset + 32));
-      offset += 32;
-      
-      const dstAddress = data.slice(offset, offset + 20);
-      offset += 20;
-      
-      const srcToken = new PublicKey(data.slice(offset, offset + 32));
-      offset += 32;
-      
-      const dstToken = data.slice(offset, offset + 20);
-      offset += 20;
-      
-      const amountView = new DataView(data.buffer, offset, 8);
-      const amount = amountView.getBigUint64(0, true);
-      offset += 8;
-      
-      const safetyView = new DataView(data.buffer, offset, 8);
-      const safetyDeposit = safetyView.getBigUint64(0, true);
-      offset += 8;
-      
-      const hashlock = data.slice(offset, offset + 32);
-      offset += 32;
-      
-      const htlcIdData = data.slice(offset, offset + 32);
-      offset += 32;
-      
-      const finalityView = new DataView(data.buffer, offset, 8);
-      const finalityDeadline = Number(finalityView.getBigInt64(0, true));
-      offset += 8;
-      
-      const resolverView = new DataView(data.buffer, offset, 8);
-      const resolverDeadline = Number(resolverView.getBigInt64(0, true));
-      offset += 8;
-      
-      const publicView = new DataView(data.buffer, offset, 8);
-      const publicDeadline = Number(publicView.getBigInt64(0, true));
-      offset += 8;
-      
-      const cancelView = new DataView(data.buffer, offset, 8);
-      const cancellationDeadline = Number(cancelView.getBigInt64(0, true));
-      offset += 8;
-      
-      const withdrawn = data[offset] === 1;
-      offset += 1;
-      
-      const cancelled = data[offset] === 1;
-      offset += 1;
-      
-      const createdAtView = new DataView(data.buffer, offset, 8);
-      const createdAt = Number(createdAtView.getBigInt64(0, true));
+      // Decode account data
+      const decoded = this.coder.accounts.decode("HTLC", accountInfo.data);
       
       return {
-        resolver: resolver.toBase58(),
-        srcAddress: srcAddress.toBase58(),
-        dstAddress: new Uint8Array(dstAddress),
-        srcToken: srcToken.toBase58(),
-        dstToken: new Uint8Array(dstToken),
-        amount,
-        safetyDeposit,
-        hashlock: new Uint8Array(hashlock),
-        htlcId: new Uint8Array(htlcIdData),
-        finalityDeadline,
-        resolverDeadline,
-        publicDeadline,
-        cancellationDeadline,
-        withdrawn,
-        cancelled,
-        createdAt,
+        resolver: decoded.resolver.toBase58(),
+        srcAddress: decoded.srcAddress.toBase58(),
+        dstAddress: new Uint8Array(decoded.dstAddress),
+        srcToken: decoded.srcToken.toBase58(),
+        dstToken: new Uint8Array(decoded.dstToken),
+        amount: BigInt(decoded.amount.toString()),
+        safetyDeposit: BigInt(decoded.safetyDeposit.toString()),
+        hashlock: new Uint8Array(decoded.hashlock),
+        htlcId: new Uint8Array(decoded.htlcId),
+        finalityDeadline: decoded.finalityDeadline.toNumber(),
+        resolverDeadline: decoded.resolverDeadline.toNumber(),
+        publicDeadline: decoded.publicDeadline.toNumber(),
+        cancellationDeadline: decoded.cancellationDeadline.toNumber(),
+        withdrawn: decoded.withdrawn,
+        cancelled: decoded.cancelled,
+        createdAt: decoded.createdAt.toNumber(),
       };
     } catch (error) {
-      this.logger.error("Failed to get HTLC state", { error });
+      this.logger.error("Failed to get HTLC state", error);
       return null;
     }
   }
@@ -565,7 +520,7 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
             }
           }
         } catch (error) {
-          this.logger.error("Error parsing event", { error });
+          this.logger.error("Error parsing event", error);
         }
       }
     );
@@ -585,54 +540,32 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
    * Parse HTLCCreated event
    */
   private parseHTLCCreatedEvent(
-    data: Uint8Array,
-    log: any
+    data: Buffer,
+    log: LogEvent
   ): HTLCCreatedEvent | null {
     try {
-      // Manual parsing based on event structure
-      let offset = 8; // Skip discriminator
+      const decoded = this.coder.events.decode(data);
+      if (!decoded || decoded.name !== "HTLCCreated") return null;
       
-      const htlcAccount = new PublicKey(data.slice(offset, offset + 32));
-      offset += 32;
-      
-      const htlcId = data.slice(offset, offset + 32);
-      offset += 32;
-      
-      const resolver = new PublicKey(data.slice(offset, offset + 32));
-      offset += 32;
-      
-      const dstAddress = data.slice(offset, offset + 20);
-      offset += 20;
-      
-      const amountView = new DataView(data.buffer, offset, 8);
-      const amount = amountView.getBigUint64(0, true);
-      offset += 8;
-      
-      const hashlock = data.slice(offset, offset + 32);
-      offset += 32;
-      
-      const deadlineView = new DataView(data.buffer, offset, 8);
-      const finalityDeadline = Number(deadlineView.getBigInt64(0, true));
-      
-      const blockTime = Math.floor(Date.now() / 1000);
+      const blockTime = Math.floor(Date.now() / 1000); // Approximate
       
       return {
         type: HTLCEventType.CREATED,
         signature: log.signature,
-        slot: 0,
+        slot: 0, // Would need to get from transaction
         blockTime,
         data: {
-          htlcAccount: htlcAccount.toBase58(),
-          htlcId: new Uint8Array(htlcId),
-          resolver: resolver.toBase58(),
-          dstAddress: new Uint8Array(dstAddress),
-          amount,
-          hashlock: new Uint8Array(hashlock),
-          finalityDeadline,
+          htlcAccount: decoded.data.htlcAccount.toBase58(),
+          htlcId: new Uint8Array(decoded.data.htlcId),
+          resolver: decoded.data.resolver.toBase58(),
+          dstAddress: new Uint8Array(decoded.data.dstAddress),
+          amount: BigInt(decoded.data.amount.toString()),
+          hashlock: new Uint8Array(decoded.data.hashlock),
+          finalityDeadline: decoded.data.finalityDeadline.toNumber(),
         },
       };
     } catch (error) {
-      this.logger.error("Failed to parse HTLCCreated event", { error });
+      this.logger.error("Failed to parse HTLCCreated event", error);
       return null;
     }
   }
@@ -641,40 +574,29 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
    * Parse HTLCWithdrawn event
    */
   private parseHTLCWithdrawnEvent(
-    data: Uint8Array,
-    log: any
+    data: Buffer,
+    log: LogEvent
   ): HTLCWithdrawnEvent | null {
     try {
-      // Manual parsing
-      let offset = 8; // Skip discriminator
+      const decoded = this.coder.events.decode(data);
+      if (!decoded || decoded.name !== "HTLCWithdrawn") return null;
       
-      const htlcAccount = new PublicKey(data.slice(offset, offset + 32));
-      offset += 32;
-      
-      const preimage = data.slice(offset, offset + 32);
-      offset += 32;
-      
-      const executor = new PublicKey(data.slice(offset, offset + 32));
-      offset += 32;
-      
-      const destination = data.slice(offset, offset + 20);
-      
-      const blockTime = Math.floor(Date.now() / 1000);
+      const blockTime = Math.floor(Date.now() / 1000); // Approximate
       
       return {
         type: HTLCEventType.WITHDRAWN,
         signature: log.signature,
-        slot: 0,
+        slot: 0, // Would need to get from transaction
         blockTime,
         data: {
-          htlcAccount: htlcAccount.toBase58(),
-          preimage: new Uint8Array(preimage),
-          executor: executor.toBase58(),
-          destination: new Uint8Array(destination),
+          htlcAccount: decoded.data.htlcAccount.toBase58(),
+          preimage: new Uint8Array(decoded.data.preimage),
+          executor: decoded.data.executor.toBase58(),
+          destination: new Uint8Array(decoded.data.destination),
         },
       };
     } catch (error) {
-      this.logger.error("Failed to parse HTLCWithdrawn event", { error });
+      this.logger.error("Failed to parse HTLCWithdrawn event", error);
       return null;
     }
   }
@@ -683,32 +605,27 @@ export class SolanaHTLCManagerKit implements ISolanaHTLCManager {
    * Parse HTLCCancelled event
    */
   private parseHTLCCancelledEvent(
-    data: Uint8Array,
-    log: any
+    data: Buffer,
+    log: LogEvent
   ): HTLCCancelledEvent | null {
     try {
-      // Manual parsing
-      let offset = 8; // Skip discriminator
+      const decoded = this.coder.events.decode(data);
+      if (!decoded || decoded.name !== "HTLCCancelled") return null;
       
-      const htlcAccount = new PublicKey(data.slice(offset, offset + 32));
-      offset += 32;
-      
-      const executor = new PublicKey(data.slice(offset, offset + 32));
-      
-      const blockTime = Math.floor(Date.now() / 1000);
+      const blockTime = Math.floor(Date.now() / 1000); // Approximate
       
       return {
         type: HTLCEventType.CANCELLED,
         signature: log.signature,
-        slot: 0,
+        slot: 0, // Would need to get from transaction
         blockTime,
         data: {
-          htlcAccount: htlcAccount.toBase58(),
-          executor: executor.toBase58(),
+          htlcAccount: decoded.data.htlcAccount.toBase58(),
+          executor: decoded.data.executor.toBase58(),
         },
       };
     } catch (error) {
-      this.logger.error("Failed to parse HTLCCancelled event", { error });
+      this.logger.error("Failed to parse HTLCCancelled event", error);
       return null;
     }
   }
