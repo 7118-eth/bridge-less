@@ -144,6 +144,12 @@ A proof-of-concept modification of 1inch's Fusion+ Atomic Swaps protocol adapted
   - Configuration management with validation
   - Structured logging and retry mechanisms
   
+- **EVM Integration** (bl-cli):
+  - Complete viem-based EVM client with WebSocket support
+  - HTLC Manager for factory interactions and event monitoring
+  - Mock client for testing without network calls
+  - 128 test steps with 100% coverage
+  
 - **EVM Contracts** (bl-evm):
   - HTLC and Factory contracts with full test coverage
   - 32 tests covering all scenarios
@@ -155,10 +161,10 @@ A proof-of-concept modification of 1inch's Fusion+ Atomic Swaps protocol adapted
   - Account structures defined
   - Instruction handlers in development
   
-- **Coordinator CLI** (bl-cli):
-  - EVM integration using viem
-  - Event monitoring system
-  - CLI commands implementation
+- **Coordinator Service** (bl-cli):
+  - Swap state machine implementation
+  - Liquidity management logic
+  - CLI commands (init, fund, swap, monitor, recover)
 
 ## Security Considerations
 
