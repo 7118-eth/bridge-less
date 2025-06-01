@@ -10,7 +10,7 @@ export type {
   TransactionInstruction,
   TransactionSignature,
   Connection,
-} from "npm:@solana/web3.js@2";
+} from "npm:@solana/web3.js@1.95";
 
 /**
  * Transaction confirmation details
