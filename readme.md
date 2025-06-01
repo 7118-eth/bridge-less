@@ -86,6 +86,7 @@ A proof-of-concept modification of 1inch's Fusion+ Atomic Swaps protocol adapted
 - **Key Adaptations**:
   - **SHA256 Hashing**: Changed from Keccak-256 to SHA-256 for Solana compatibility
   - **Non-EVM Address Support**: Added `bytes32 dstRecipient` field for 32-byte Solana addresses
+  - **Cross-Chain Token Addressing**: The `dstToken` field in `ExtraDataArgs` struct uses the EVM `Address` type (20 bytes). For non-EVM chains like Solana that use 32-byte addresses, token addresses need to be handled separately or converted
   - **Backward Compatible**: Maintains compatibility with EVM-to-EVM swaps
   - **Chain Detection**: MSB of `dstChainId` indicates non-EVM chains (1 = non-EVM)
 
@@ -138,35 +139,37 @@ A proof-of-concept modification of 1inch's Fusion+ Atomic Swaps protocol adapted
 
 ## Development Status
 
-### ✅ Completed - FULL IMPLEMENTATION READY!
+### ✅ Completed Components
 
-**All Core Components Complete and Tested:**
-
-- **Coordinator CLI** (bl-cli):
-  - ✅ **ALL 158 tests passing** - Production ready!
-  - ✅ Complete swap lifecycle management with state machine
-  - ✅ All CLI commands functional (init, fund, swap, monitor, recover, status, help)
-  - ✅ EVM integration with viem client and HTLC manager
-  - ✅ Liquidity tracking and management
-  - ✅ Mock Solana integration ready for real implementation
-  - ✅ Comprehensive error handling and logging
+- **EVM Contracts** (bl-evm):
+  - ✅ HTLC and Factory contracts with full test coverage
+  - ✅ 32 tests covering all scenarios
+  - ✅ Gas-optimized implementation
+  - ✅ Deployed to local testnet
   
 - **Solana Program** (bl-svm):
-  - ✅ **ALL 10/10 tests passing** - Production ready!
+  - ✅ **ALL 10/10 tests passing**
   - ✅ Complete HTLC implementation with create/withdraw/cancel
   - ✅ PDA-based architecture with token vaults
   - ✅ SHA256 cross-chain compatibility
   - ✅ Multi-phase timelock system
   - ✅ SPL Token integration working
   - ✅ Event emission for coordinator integration
-  
-- **EVM Contracts** (bl-evm):
-  - ✅ HTLC and Factory contracts with full test coverage
-  - ✅ 32 tests covering all scenarios
-  - ✅ Gas-optimized implementation
-  - ✅ Deployed to local testnet
 
-### 🚀 Ready for Integration
+### 🚧 In Development
+
+- **Coordinator CLI** (bl-cli):
+  - ✅ **ALL 158 tests passing** (with mock Solana implementation)
+  - ✅ Complete swap lifecycle management with state machine
+  - ✅ All CLI commands functional (init, fund, swap, monitor, recover, status, help)
+  - ✅ EVM integration with viem client and HTLC manager
+  - ✅ Liquidity tracking and management
+  - ✅ Comprehensive error handling and logging
+  - 🚧 **Solana (SVM) integration in active development** - currently using mock implementation
+  - 🚧 See [`bl-cli/docs/svm-implementation-plan.md`](bl-cli/docs/svm-implementation-plan.md) for work in progress
+
+### 🔜 Next Steps
+- Complete Solana integration in bl-cli (replacing mock with real implementation)
 - Cross-chain HTLC ID compatibility testing
 - End-to-end swap flow with real contracts
 - WebSocket event monitoring implementation
