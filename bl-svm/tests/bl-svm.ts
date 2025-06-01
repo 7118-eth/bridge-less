@@ -10,7 +10,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 import { assert } from "chai";
-import crypto from "crypto";
+import * as crypto from "crypto";
 
 describe("bl-svm", () => {
   // Configure the client to use the local cluster.

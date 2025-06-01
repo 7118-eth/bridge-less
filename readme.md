@@ -150,6 +150,13 @@ A proof-of-concept modification of 1inch's Fusion+ Atomic Swaps protocol adapted
   - Mock client for testing without network calls
   - 128 test steps with 100% coverage
   
+- **Coordinator Service** (bl-cli):
+  - Full swap lifecycle management with state machine
+  - Liquidity tracking and management
+  - All CLI commands (init, fund, swap, monitor, recover, status, help)
+  - Mock Solana integration ready for real implementation
+  - 154 test steps across 6 test files
+  
 - **EVM Contracts** (bl-evm):
   - HTLC and Factory contracts with full test coverage
   - 32 tests covering all scenarios
@@ -158,13 +165,11 @@ A proof-of-concept modification of 1inch's Fusion+ Atomic Swaps protocol adapted
 
 ### ⏳ In Progress
 - **Solana Program** (bl-svm):
-  - Account structures defined
-  - Instruction handlers in development
-  
-- **Coordinator Service** (bl-cli):
-  - Swap state machine implementation
-  - Liquidity management logic
-  - CLI commands (init, fund, swap, monitor, recover)
+  - ✅ Program structure and instruction handlers implemented
+  - ✅ Building successfully with Anchor 0.31.1
+  - ✅ 6/10 tests passing (timing synchronization issues in 4 tests)
+  - ⏳ Integration testing with coordinator
+  - ⏳ Cross-chain ID compatibility verification
 
 ## Security Considerations
 
