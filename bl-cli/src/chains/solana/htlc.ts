@@ -1,0 +1,552 @@
+/**
+ * Solana HTLC manager implementation
+ */
+
+import {
+  PublicKey,
+  Keypair,
+  Transaction,
+  TransactionInstruction,
+  SystemProgram,
+  SYSVAR_CLOCK_PUBKEY,
+} from "npm:@solana/web3.js@2";
+import {
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+} from "npm:@solana/spl-token@0.4";
+import { BorshCoder } from "npm:@coral-xyz/anchor@0.30.1";
+import type {
+  ISolanaHTLCManager,
+  ISolanaClient,
+  CreateHTLCParams,
+  CreateHTLCResult,
+  HTLCState,
+  SolanaHTLCEvent,
+  HTLCEventType,
+  HTLCCreatedEvent,
+  HTLCWithdrawnEvent,
+  HTLCCancelledEvent,
+} from "./types.ts";
+import { SolanaError, SolanaErrorCode } from "./types.ts";
+import { Logger } from "../../utils/logger.ts";
+import idl from "../../../idl/bl_svm.json" with { type: "json" };
+
+/**
+ * Discriminators from IDL for event parsing
+ */
+const EVENT_DISCRIMINATORS = {
+  HTLCCreated: [115, 208, 175, 214, 231, 165, 231, 151],
+  HTLCWithdrawn: [234, 147, 184, 74, 116, 176, 252, 98],
+  HTLCCancelled: [158, 220, 88, 107, 94, 201, 107, 149],
+};
+
+/**
+ * HTLC manager configuration
+ */
+export interface HTLCManagerConfig {
+  client: ISolanaClient;
+  programId: string;
+  tokenMint: string;
+  keypair: Keypair;
+  logger?: Logger;
+}
+
+/**
+ * Solana HTLC manager implementation
+ */
+export class SolanaHTLCManager implements ISolanaHTLCManager {
+  private client: ISolanaClient & { connection: any };
+  private programId: PublicKey;
+  private tokenMint: PublicKey;
+  private keypair: Keypair;
+  private logger: Logger;
+  private coder: BorshCoder;
+
+  constructor(config: HTLCManagerConfig) {
+    this.client = config.client as ISolanaClient & { connection: any };
+    this.programId = new PublicKey(config.programId);
+    this.tokenMint = new PublicKey(config.tokenMint);
+    this.keypair = config.keypair;
+    this.logger = config.logger || new Logger("solana-htlc");
+    
+    // Initialize Anchor coder for event parsing
+    this.coder = new BorshCoder(idl as any);
+  }
+
+  async createHTLC(params: CreateHTLCParams): Promise<CreateHTLCResult> {
+    try {
+      // Derive HTLC PDA
+      const [htlcPda, bump] = await PublicKey.findProgramAddressSync(
+        [Buffer.from("htlc"), params.htlcId],
+        this.programId
+      );
+      
+      this.logger.info("Creating HTLC", {
+        htlcId: Buffer.from(params.htlcId).toString("hex"),
+        htlcPda: htlcPda.toBase58(),
+      });
+      
+      // Get resolver's token account
+      const resolverTokenAccount = await getAssociatedTokenAddress(
+        this.tokenMint,
+        this.keypair.publicKey
+      );
+      
+      // Derive HTLC vault PDA
+      const [htlcVault] = await PublicKey.findProgramAddressSync(
+        [
+          htlcPda.toBuffer(),
+          TOKEN_PROGRAM_ID.toBuffer(),
+          this.tokenMint.toBuffer(),
+        ],
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      );
+      
+      // Build instruction data
+      const instructionData = this.coder.instruction.encode("create_htlc", {
+        params: {
+          htlcId: Array.from(params.htlcId),
+          dstAddress: Array.from(params.destinationAddress),
+          dstToken: Array.from(params.destinationToken),
+          amount: params.amount.toString(),
+          safetyDeposit: params.safetyDeposit.toString(),
+          hashlock: Array.from(params.hashlock),
+          finalityDeadline: params.timelocks.finality,
+          resolverDeadline: params.timelocks.resolver,
+          publicDeadline: params.timelocks.public,
+          cancellationDeadline: params.timelocks.cancellation,
+        },
+      });
+      
+      // Create instruction
+      const instruction = new TransactionInstruction({
+        programId: this.programId,
+        keys: [
+          { pubkey: this.keypair.publicKey, isSigner: true, isWritable: true },
+          { pubkey: htlcPda, isSigner: false, isWritable: true },
+          { pubkey: this.tokenMint, isSigner: false, isWritable: false },
+          { pubkey: resolverTokenAccount, isSigner: false, isWritable: true },
+          { pubkey: htlcVault, isSigner: false, isWritable: true },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        ],
+        data: Buffer.from(instructionData),
+      });
+      
+      // Create and send transaction
+      const transaction = new Transaction().add(instruction);
+      
+      // Get recent blockhash
+      const { blockhash } = await this.client.connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = this.keypair.publicKey;
+      
+      // Sign transaction
+      transaction.sign(this.keypair);
+      
+      // Send transaction
+      const signature = await this.client.sendTransaction(transaction);
+      
+      // Wait for confirmation
+      const confirmation = await this.client.waitForTransaction(signature);
+      
+      this.logger.info("HTLC created", {
+        htlcAddress: htlcPda.toBase58(),
+        transactionHash: signature,
+        slot: confirmation.slot,
+      });
+      
+      return {
+        htlcAddress: htlcPda.toBase58(),
+        transactionHash: signature,
+        slot: confirmation.slot,
+      };
+    } catch (error) {
+      this.logger.error("Failed to create HTLC", error);
+      throw new SolanaError(
+        "Failed to create HTLC",
+        SolanaErrorCode.TRANSACTION_FAILED,
+        error
+      );
+    }
+  }
+
+  async withdrawToDestination(
+    htlcId: Uint8Array,
+    preimage: Uint8Array
+  ): Promise<string> {
+    try {
+      // Derive HTLC PDA
+      const [htlcPda] = await PublicKey.findProgramAddressSync(
+        [Buffer.from("htlc"), htlcId],
+        this.programId
+      );
+      
+      this.logger.info("Withdrawing from HTLC", {
+        htlcId: Buffer.from(htlcId).toString("hex"),
+        htlcPda: htlcPda.toBase58(),
+      });
+      
+      // Get executor's token account
+      const executorTokenAccount = await getAssociatedTokenAddress(
+        this.tokenMint,
+        this.keypair.publicKey
+      );
+      
+      // Derive HTLC vault PDA
+      const [htlcVault] = await PublicKey.findProgramAddressSync(
+        [
+          htlcPda.toBuffer(),
+          TOKEN_PROGRAM_ID.toBuffer(),
+          this.tokenMint.toBuffer(),
+        ],
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      );
+      
+      // Build instruction data
+      const instructionData = this.coder.instruction.encode(
+        "withdraw_to_destination",
+        {
+          preimage: Array.from(preimage),
+        }
+      );
+      
+      // Create instruction
+      const instruction = new TransactionInstruction({
+        programId: this.programId,
+        keys: [
+          { pubkey: this.keypair.publicKey, isSigner: true, isWritable: true },
+          { pubkey: htlcPda, isSigner: false, isWritable: true },
+          { pubkey: this.tokenMint, isSigner: false, isWritable: false },
+          { pubkey: htlcVault, isSigner: false, isWritable: true },
+          { pubkey: executorTokenAccount, isSigner: false, isWritable: true },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        ],
+        data: Buffer.from(instructionData),
+      });
+      
+      // Create and send transaction
+      const transaction = new Transaction().add(instruction);
+      
+      // Get recent blockhash
+      const { blockhash } = await this.client.connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = this.keypair.publicKey;
+      
+      // Sign transaction
+      transaction.sign(this.keypair);
+      
+      // Send transaction
+      const signature = await this.client.sendTransaction(transaction);
+      
+      // Wait for confirmation
+      await this.client.waitForTransaction(signature);
+      
+      this.logger.info("HTLC withdrawn", {
+        htlcAddress: htlcPda.toBase58(),
+        transactionHash: signature,
+      });
+      
+      return signature;
+    } catch (error) {
+      this.logger.error("Failed to withdraw from HTLC", error);
+      throw new SolanaError(
+        "Failed to withdraw from HTLC",
+        SolanaErrorCode.TRANSACTION_FAILED,
+        error
+      );
+    }
+  }
+
+  async cancel(htlcId: Uint8Array): Promise<string> {
+    try {
+      // Derive HTLC PDA
+      const [htlcPda] = await PublicKey.findProgramAddressSync(
+        [Buffer.from("htlc"), htlcId],
+        this.programId
+      );
+      
+      this.logger.info("Cancelling HTLC", {
+        htlcId: Buffer.from(htlcId).toString("hex"),
+        htlcPda: htlcPda.toBase58(),
+      });
+      
+      // Get HTLC state to find src_address
+      const htlcState = await this.getHTLCState(htlcId);
+      if (!htlcState) {
+        throw new Error("HTLC not found");
+      }
+      
+      const srcAddress = new PublicKey(htlcState.srcAddress);
+      
+      // Get source token account
+      const srcTokenAccount = await getAssociatedTokenAddress(
+        this.tokenMint,
+        srcAddress
+      );
+      
+      // Derive HTLC vault PDA
+      const [htlcVault] = await PublicKey.findProgramAddressSync(
+        [
+          htlcPda.toBuffer(),
+          TOKEN_PROGRAM_ID.toBuffer(),
+          this.tokenMint.toBuffer(),
+        ],
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      );
+      
+      // Build instruction data
+      const instructionData = this.coder.instruction.encode("cancel", {});
+      
+      // Create instruction
+      const instruction = new TransactionInstruction({
+        programId: this.programId,
+        keys: [
+          { pubkey: this.keypair.publicKey, isSigner: true, isWritable: true },
+          { pubkey: htlcPda, isSigner: false, isWritable: true },
+          { pubkey: srcAddress, isSigner: false, isWritable: true },
+          { pubkey: this.tokenMint, isSigner: false, isWritable: false },
+          { pubkey: htlcVault, isSigner: false, isWritable: true },
+          { pubkey: srcTokenAccount, isSigner: false, isWritable: true },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        ],
+        data: Buffer.from(instructionData),
+      });
+      
+      // Create and send transaction
+      const transaction = new Transaction().add(instruction);
+      
+      // Get recent blockhash
+      const { blockhash } = await this.client.connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = this.keypair.publicKey;
+      
+      // Sign transaction
+      transaction.sign(this.keypair);
+      
+      // Send transaction
+      const signature = await this.client.sendTransaction(transaction);
+      
+      // Wait for confirmation
+      await this.client.waitForTransaction(signature);
+      
+      this.logger.info("HTLC cancelled", {
+        htlcAddress: htlcPda.toBase58(),
+        transactionHash: signature,
+      });
+      
+      return signature;
+    } catch (error) {
+      this.logger.error("Failed to cancel HTLC", error);
+      throw new SolanaError(
+        "Failed to cancel HTLC",
+        SolanaErrorCode.TRANSACTION_FAILED,
+        error
+      );
+    }
+  }
+
+  async getHTLCState(htlcId: Uint8Array): Promise<HTLCState | null> {
+    try {
+      // Derive HTLC PDA
+      const [htlcPda] = await PublicKey.findProgramAddressSync(
+        [Buffer.from("htlc"), htlcId],
+        this.programId
+      );
+      
+      // Get account info
+      const accountInfo = await this.client.connection.getAccountInfo(htlcPda);
+      if (!accountInfo) {
+        return null;
+      }
+      
+      // Decode account data
+      const decoded = this.coder.accounts.decode("HTLC", accountInfo.data);
+      
+      return {
+        resolver: decoded.resolver.toBase58(),
+        srcAddress: decoded.srcAddress.toBase58(),
+        dstAddress: new Uint8Array(decoded.dstAddress),
+        srcToken: decoded.srcToken.toBase58(),
+        dstToken: new Uint8Array(decoded.dstToken),
+        amount: BigInt(decoded.amount.toString()),
+        safetyDeposit: BigInt(decoded.safetyDeposit.toString()),
+        hashlock: new Uint8Array(decoded.hashlock),
+        htlcId: new Uint8Array(decoded.htlcId),
+        finalityDeadline: decoded.finalityDeadline.toNumber(),
+        resolverDeadline: decoded.resolverDeadline.toNumber(),
+        publicDeadline: decoded.publicDeadline.toNumber(),
+        cancellationDeadline: decoded.cancellationDeadline.toNumber(),
+        withdrawn: decoded.withdrawn,
+        cancelled: decoded.cancelled,
+        createdAt: decoded.createdAt.toNumber(),
+      };
+    } catch (error) {
+      this.logger.error("Failed to get HTLC state", error);
+      return null;
+    }
+  }
+
+  async watchHTLCEvents(
+    callback: (event: SolanaHTLCEvent) => void
+  ): Promise<() => void> {
+    this.logger.info("Starting HTLC event monitoring");
+    
+    // Subscribe to program logs
+    const unsubscribe = await this.client.subscribeToLogs(
+      this.programId.toBase58(),
+      async (log) => {
+        try {
+          // Parse logs for events
+          for (const logMessage of log.logs) {
+            // Check if this is an event log
+            if (logMessage.includes("Program data:")) {
+              const dataStr = logMessage.split("Program data: ")[1];
+              if (!dataStr) continue;
+              
+              // Decode base64 data
+              const data = Buffer.from(dataStr, "base64");
+              
+              // Check discriminator
+              const discriminator = data.slice(0, 8);
+              
+              if (this.arraysEqual(discriminator, EVENT_DISCRIMINATORS.HTLCCreated)) {
+                const event = this.parseHTLCCreatedEvent(data, log);
+                if (event) callback(event);
+              } else if (this.arraysEqual(discriminator, EVENT_DISCRIMINATORS.HTLCWithdrawn)) {
+                const event = this.parseHTLCWithdrawnEvent(data, log);
+                if (event) callback(event);
+              } else if (this.arraysEqual(discriminator, EVENT_DISCRIMINATORS.HTLCCancelled)) {
+                const event = this.parseHTLCCancelledEvent(data, log);
+                if (event) callback(event);
+              }
+            }
+          }
+        } catch (error) {
+          this.logger.error("Error parsing event", error);
+        }
+      }
+    );
+    
+    return unsubscribe;
+  }
+
+  async getHTLCAddress(htlcId: Uint8Array): Promise<string> {
+    const [htlcPda] = await PublicKey.findProgramAddressSync(
+      [Buffer.from("htlc"), htlcId],
+      this.programId
+    );
+    return htlcPda.toBase58();
+  }
+
+  /**
+   * Parse HTLCCreated event
+   */
+  private parseHTLCCreatedEvent(
+    data: Buffer,
+    log: LogEvent
+  ): HTLCCreatedEvent | null {
+    try {
+      const decoded = this.coder.events.decode(data);
+      if (!decoded || decoded.name !== "HTLCCreated") return null;
+      
+      const blockTime = Math.floor(Date.now() / 1000); // Approximate
+      
+      return {
+        type: HTLCEventType.CREATED,
+        signature: log.signature,
+        slot: 0, // Would need to get from transaction
+        blockTime,
+        data: {
+          htlcAccount: decoded.data.htlcAccount.toBase58(),
+          htlcId: new Uint8Array(decoded.data.htlcId),
+          resolver: decoded.data.resolver.toBase58(),
+          dstAddress: new Uint8Array(decoded.data.dstAddress),
+          amount: BigInt(decoded.data.amount.toString()),
+          hashlock: new Uint8Array(decoded.data.hashlock),
+          finalityDeadline: decoded.data.finalityDeadline.toNumber(),
+        },
+      };
+    } catch (error) {
+      this.logger.error("Failed to parse HTLCCreated event", error);
+      return null;
+    }
+  }
+
+  /**
+   * Parse HTLCWithdrawn event
+   */
+  private parseHTLCWithdrawnEvent(
+    data: Buffer,
+    log: LogEvent
+  ): HTLCWithdrawnEvent | null {
+    try {
+      const decoded = this.coder.events.decode(data);
+      if (!decoded || decoded.name !== "HTLCWithdrawn") return null;
+      
+      const blockTime = Math.floor(Date.now() / 1000); // Approximate
+      
+      return {
+        type: HTLCEventType.WITHDRAWN,
+        signature: log.signature,
+        slot: 0, // Would need to get from transaction
+        blockTime,
+        data: {
+          htlcAccount: decoded.data.htlcAccount.toBase58(),
+          preimage: new Uint8Array(decoded.data.preimage),
+          executor: decoded.data.executor.toBase58(),
+          destination: new Uint8Array(decoded.data.destination),
+        },
+      };
+    } catch (error) {
+      this.logger.error("Failed to parse HTLCWithdrawn event", error);
+      return null;
+    }
+  }
+
+  /**
+   * Parse HTLCCancelled event
+   */
+  private parseHTLCCancelledEvent(
+    data: Buffer,
+    log: LogEvent
+  ): HTLCCancelledEvent | null {
+    try {
+      const decoded = this.coder.events.decode(data);
+      if (!decoded || decoded.name !== "HTLCCancelled") return null;
+      
+      const blockTime = Math.floor(Date.now() / 1000); // Approximate
+      
+      return {
+        type: HTLCEventType.CANCELLED,
+        signature: log.signature,
+        slot: 0, // Would need to get from transaction
+        blockTime,
+        data: {
+          htlcAccount: decoded.data.htlcAccount.toBase58(),
+          executor: decoded.data.executor.toBase58(),
+        },
+      };
+    } catch (error) {
+      this.logger.error("Failed to parse HTLCCancelled event", error);
+      return null;
+    }
+  }
+
+  /**
+   * Helper to compare arrays
+   */
+  private arraysEqual(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+}
