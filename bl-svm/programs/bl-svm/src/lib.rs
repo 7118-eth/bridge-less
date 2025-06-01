@@ -4,7 +4,7 @@ use anchor_spl::{
     token::{Mint, Token, TokenAccount},
 };
 
-declare_id!("5dkHPRP7JU8k8rPScNLX6eG8vLhtMvciFjKxAsDqzBcL");
+declare_id!("7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY");
 
 pub mod errors;
 pub mod events; 
