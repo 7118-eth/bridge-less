@@ -58,11 +58,11 @@ contract DeployAllScript is Script {
         console.log("Deployment complete!");
         console.log("========================================");
         
-        // Save deployment addresses to file (useful for verification)
-        _saveDeploymentInfo(address(token), address(factory));
+        // Log deployment addresses (for reference)
+        _logDeploymentInfo(address(token), address(factory));
     }
     
-    function _saveDeploymentInfo(address token, address factory) internal {
+    function _logDeploymentInfo(address token, address factory) internal view {
         string memory deploymentInfo = string(abi.encodePacked(
             "{\n",
             "  \"chainId\": ", vm.toString(block.chainid), ",\n",
@@ -73,13 +73,12 @@ contract DeployAllScript is Script {
             "}\n"
         ));
         
-        string memory filename = string(abi.encodePacked(
-            "deployments/",
-            vm.toString(block.chainid),
-            "-latest.json"
-        ));
+        // For local deployments, just log the info
+        console.log("\n========== Deployment Info ==========");
+        console.log(deploymentInfo);
+        console.log("====================================");
         
-        vm.writeFile(filename, deploymentInfo);
-        console.log("\nDeployment info saved to:", filename);
+        // Note: To save deployment info, create a deployments/ directory
+        // and use: vm.writeFile("./deployments/<chainId>-latest.json", deploymentInfo);
     }
 }

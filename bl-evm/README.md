@@ -86,7 +86,7 @@ forge script script/DeployAll.s.sol --rpc-url https://mainnet.base.org --broadca
 
 ### Deployment Verification
 
-After deployment, contract addresses are saved to `deployments/<chainId>-latest.json`.
+After deployment, contract addresses are logged to the console. Save these addresses for future reference.
 
 To verify contracts on Basescan:
 ```bash
