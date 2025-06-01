@@ -78,12 +78,12 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
     try {
       // Derive HTLC PDA
       const [htlcPda, bump] = PublicKey.findProgramAddressSync(
-        [Buffer.from("htlc"), params.htlcId],
+        [new TextEncoder().encode("htlc"), params.htlcId],
         this.programId
       );
       
       this.logger.info("Creating HTLC", {
-        htlcId: Buffer.from(params.htlcId).toString("hex"),
+        htlcId: Array.from(params.htlcId, b => b.toString(16).padStart(2, '0')).join(''),
         htlcPda: htlcPda.toBase58(),
       });
       
@@ -132,7 +132,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
           { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         ],
-        data: Buffer.from(instructionData),
+        data: new Uint8Array(instructionData),
       });
       
       // Create and send transaction
@@ -180,12 +180,12 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
     try {
       // Derive HTLC PDA
       const [htlcPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("htlc"), htlcId],
+        [new TextEncoder().encode("htlc"), htlcId],
         this.programId
       );
       
       this.logger.info("Withdrawing from HTLC", {
-        htlcId: Buffer.from(htlcId).toString("hex"),
+        htlcId: Array.from(htlcId, b => b.toString(16).padStart(2, '0')).join(''),
         htlcPda: htlcPda.toBase58(),
       });
       
@@ -226,7 +226,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
           { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         ],
-        data: Buffer.from(instructionData),
+        data: new Uint8Array(instructionData),
       });
       
       // Create and send transaction
@@ -266,12 +266,12 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
     try {
       // Derive HTLC PDA
       const [htlcPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("htlc"), htlcId],
+        [new TextEncoder().encode("htlc"), htlcId],
         this.programId
       );
       
       this.logger.info("Cancelling HTLC", {
-        htlcId: Buffer.from(htlcId).toString("hex"),
+        htlcId: Array.from(htlcId, b => b.toString(16).padStart(2, '0')).join(''),
         htlcPda: htlcPda.toBase58(),
       });
       
@@ -316,7 +316,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
           { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         ],
-        data: Buffer.from(instructionData),
+        data: new Uint8Array(instructionData),
       });
       
       // Create and send transaction
@@ -356,7 +356,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
     try {
       // Derive HTLC PDA
       const [htlcPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("htlc"), htlcId],
+        [new TextEncoder().encode("htlc"), htlcId],
         this.programId
       );
       
@@ -411,7 +411,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
               if (!dataStr) continue;
               
               // Decode base64 data
-              const data = Buffer.from(dataStr, "base64");
+              const data = Uint8Array.from(atob(dataStr), c => c.charCodeAt(0));
               
               // Check discriminator
               const discriminator = data.slice(0, 8);
@@ -439,7 +439,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
 
   async getHTLCAddress(htlcId: Uint8Array): Promise<string> {
     const [htlcPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("htlc"), htlcId],
+      [new TextEncoder().encode("htlc"), htlcId],
       this.programId
     );
     return htlcPda.toBase58();
