@@ -5,27 +5,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ### Build & Test
-- **Test**: `deno test` - Runs all tests
-- **Test (watch)**: `deno test --watch` - Runs tests in watch mode
-- **Test (coverage)**: `deno test --coverage` - Runs tests with code coverage
-- **Test (specific)**: `deno test **/pattern.test.ts` - Run specific test files
+- **Test**: `deno task test` - Runs all tests with proper permissions
+- **Test (watch)**: `deno task test:watch` - Runs tests in watch mode
+- **Test (coverage)**: `deno task test:coverage` - Runs tests with code coverage
+- **Test (specific)**: `deno test --no-check --allow-env --allow-read --allow-write **/pattern_test.ts` - Run specific test files
 - **Type Check**: `deno check main.ts` - Type check without running
 
 ### Code Quality
-- **Format**: `deno fmt` - Formats TypeScript code according to Deno style guide
-- **Lint**: `deno lint` - Lints code for common issues
-- **Benchmark**: `deno bench` - Run performance benchmarks
+- **Format**: `deno task fmt` - Formats TypeScript code according to Deno style guide
+- **Lint**: `deno task lint` - Lints code for common issues and checks formatting
+- **Format Check**: `deno fmt --check` - Check if code is properly formatted
 
 ### Development
-- **Run**: `deno run --allow-net --allow-env --allow-read main.ts` - Run the CLI
-- **Watch**: `deno run --watch --allow-net --allow-env --allow-read main.ts` - Run with auto-reload
-- **Compile**: `deno compile --allow-net --allow-env --allow-read -o bl-cli main.ts` - Create standalone executable
+- **Run**: `deno task dev` - Run the CLI in development mode with auto-reload
+- **Build**: `deno task build` - Create standalone executable with proper env loading
+
+### CLI Commands (via deno tasks)
+- **Initialize**: `deno task init` - Initialize coordinator and check configuration
+- **Fund**: `deno task fund` - Fund coordinator wallets with tokens
+- **Swap**: `deno task swap` - Execute a cross-chain swap
+- **Monitor**: `deno task monitor` - Monitor active swaps
+- **Recover**: `deno task recover` - Recover stuck swaps  
+- **Status**: `deno task status` - Get status of a specific swap
+- **Help**: `deno task help` - Show usage information
 
 ### Tasks (defined in deno.json)
-- **dev**: Development mode with auto-reload
-- **test**: Run test suite
+All tasks automatically include `--env-file=.env` for proper environment loading:
+- **dev**: Development mode with auto-reload and env loading
+- **test**: Run test suite with proper permissions
+- **test:watch**: Run tests in watch mode
+- **test:coverage**: Run tests with coverage
 - **lint**: Lint and format code
-- **build**: Compile to executable
+- **fmt**: Format code
+- **build**: Compile to executable with env support
+- **init, fund, swap, monitor, recover, status, help**: CLI commands with env loading
 
 ## Architecture
 
@@ -253,12 +266,11 @@ Deno.test("config loads correctly", async (t) => {
    git clone <repo>
    cd bl-cli
    
-   # Copy environment template
-   cp .env.example .env
-   # Edit .env with your values
+   # .env file is already configured with deployed contracts
+   # No need to copy .env.example - it's just a template
    
    # Run tests
-   deno test
+   deno task test
    
    # Start development
    deno task dev
@@ -281,38 +293,52 @@ Deno.test("config loads correctly", async (t) => {
 
 ## CLI Commands
 
-### Main Commands
+### Main Commands (via deno tasks)
 ```bash
-# Initialize coordinator
-deno run --allow-net --allow-env --allow-read main.ts init
+# Initialize coordinator (loads .env automatically)
+deno task init
 
 # Fund liquidity pools
-deno run --allow-net --allow-env --allow-read main.ts fund --amount 10000
+deno task fund --amount 10000
 
 # Execute swap
-deno run --allow-net --allow-env --allow-read main.ts swap --from evm --to solana --amount 1
+deno task swap --from evm --to solana --amount 1000000
 
 # Monitor swaps
-deno run --allow-net --allow-env --allow-read main.ts monitor
+deno task monitor
 
 # Recover stuck swaps
-deno run --allow-net --allow-env --allow-read main.ts recover
+deno task recover
+
+# Check specific swap status
+deno task status --id <swap-id>
+
+# Show help
+deno task help
 ```
 
 ### Development Commands
 ```bash
-# Run specific test
-deno test src/crypto/secret_test.ts
+# Run all tests
+deno task test
 
-# Run with permissions (for integration tests)
-deno test --allow-net --allow-env tests/integration/
+# Run tests in watch mode
+deno task test:watch
+
+# Run specific test
+deno test --no-check --allow-env --allow-read --allow-write src/crypto/secret_test.ts
 
 # Generate coverage report
-deno test --coverage=coverage
-deno coverage coverage --html
+deno task test:coverage
+
+# Lint and format code
+deno task lint
+
+# Format code
+deno task fmt
 
 # Create executable
-deno compile --allow-net --allow-env --allow-read -o bl-cli main.ts
+deno task build
 ```
 
 ## Production Considerations
@@ -458,10 +484,11 @@ Note: Solana integration is deferred as the SVM contracts are not yet implemente
 ## Important Implementation Details
 
 ### Environment Setup
-- Local EVM contracts are already deployed (see .env file)
-- Token contract: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
-- HTLC factory contract: `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`
-- Test accounts with private keys are available
+- **IMPORTANT**: Local EVM contracts are already deployed and configured in the actual `.env` file (not .env.example)
+- All deno tasks automatically load `.env` using `--env-file=.env` flag
+- Token contract and HTLC factory addresses are pre-configured in `.env`
+- Test accounts with private keys are available in `.env`
+- **Never use .env.example for actual commands** - it's just a template
 
 ### Key Design Decisions
 1. **Interface-First Development**: All modules have comprehensive TypeScript interfaces
@@ -739,22 +766,23 @@ bl-cli/
 
 ### Ready for Production Testing
 1. **Environment Setup**:
-   - Copy `.env.example` to `.env`
-   - Add coordinator and user private keys
-   - Contracts already deployed at addresses in .env.example
+   - ✅ **Already configured**: `.env` file contains deployed contracts and test accounts
+   - ✅ **Ready to use**: All deno tasks automatically load environment variables
+   - ✅ **No setup needed**: Contracts are deployed, accounts are funded
 
 2. **Test the CLI** (Ready for real blockchain interaction):
    ```bash
    # First, ensure local EVM node is running
-   # Then test commands:
-   deno run --allow-net --allow-env --allow-read main.ts init
-   deno run --allow-net --allow-env --allow-read main.ts swap --amount 1000000
+   # Then test commands using deno tasks:
+   deno task init
+   deno task swap --amount 1000000
+   deno task monitor
    ```
 
 3. **Run Tests**:
    ```bash
    # All tests should pass
-   deno test --no-check --allow-env --allow-read --allow-write
+   deno task test
    ```
 
 ### Known Issues & Solutions
@@ -945,13 +973,13 @@ bl-cli/
 #### **Immediate Next Steps** (Priority Order):
 1. **Real Contract Testing**:
    ```bash
-   # Copy environment file
-   cp .env.example .env
-   # Add private keys to .env file
+   # .env file is already configured with deployed contracts
+   # No setup needed - contracts and keys are pre-configured
    
-   # Test with real EVM contracts (contracts already deployed)
-   deno run --allow-net --allow-env --allow-read main.ts init
-   deno run --allow-net --allow-env --allow-read main.ts swap --amount 1000000
+   # Test with real EVM contracts using deno tasks
+   deno task init
+   deno task swap --amount 1000000
+   deno task monitor
    ```
 
 2. **WebSocket Event Monitoring**:
@@ -971,30 +999,37 @@ bl-cli/
 - Performance optimization and batching
 
 ### 🔑 Environment Configuration
-```bash
-# Required environment variables (.env file):
-evm_coordinator_private_key=0x...     # 64 hex chars
-evm_user_private_key=0x...           # 64 hex chars  
-evm_user_address=0x...               # 40 hex chars
-evm_token_contract_address=0x5FbDB2315678afecb367f032d93F642f64180aa3      # Already deployed
-evm_htlc_factory_contract_address=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512  # Already deployed
+**CRITICAL**: The `.env` file is already configured with deployed contracts and test accounts!
 
-# Optional (defaults work for local development):
+```bash
+# .env file contains (already configured):
+evm_coordinator_private_key=0x...     # Pre-configured test account
+evm_user_private_key=0x...           # Pre-configured test account  
+evm_user_address=0x...               # Pre-configured test address
+evm_token_contract_address=0x...      # Already deployed on local network
+evm_htlc_factory_contract_address=0x... # Already deployed on local network
+
+# Network configuration (pre-configured):
 evm_rpc=http://127.0.0.1:8545
 evm_rpc_ws=ws://127.0.0.1:8545
 ```
 
+**All deno tasks automatically load .env using `--env-file=.env` flag**
+
 ### 🧪 Test Commands
 ```bash
 # Run all tests (should show 158 passing steps)
-deno test --no-check --allow-env --allow-read --allow-write
+deno task test
+
+# Run tests in watch mode
+deno task test:watch
 
 # Run specific module tests
 deno test --no-check --allow-env --allow-read --allow-write src/coordinator/coordinator_test.ts
 deno test --no-check --allow-env --allow-read --allow-write src/crypto/secret_test.ts
 
 # Run with coverage
-deno test --coverage --allow-env --allow-read --allow-write
+deno task test:coverage
 ```
 
 ### 💡 Key Insights for Future Development
@@ -1029,7 +1064,7 @@ deno test --coverage --allow-env --allow-read --allow-write
 1. **Don't Modify Secret Generation**: The async crypto operations are now working correctly - don't change them
 2. **Preserve Test Mode**: The `testMode` flag is essential for test stability
 3. **Private Key Format**: Must be exactly 64 hex chars with 0x prefix
-4. **Contract Addresses**: EVM contracts are already deployed at addresses in .env.example
+4. **Contract Addresses**: EVM contracts are already deployed and configured in the actual `.env` file
 5. **Mock Strategy**: Keep mock implementations for unit tests, only use real contracts for integration tests
 
 ### 🎯 Success Criteria for Next Phase
