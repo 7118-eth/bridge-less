@@ -368,11 +368,37 @@ deno compile --allow-net --allow-env --allow-read -o bl-cli main.ts
    - `retry.ts`: Retry with exponential backoff, jitter, and strategies
    - `index.ts`: Public API exports
 
-### Phase 2: EVM Integration (NEXT)
-- [ ] Viem client wrapper
-- [ ] HTLC factory interaction
-- [ ] Event monitoring
-- [ ] Transaction management
+### Phase 2: EVM Integration ✅ COMPLETED
+- [x] Viem client wrapper
+- [x] HTLC factory interaction
+- [x] Event monitoring
+- [x] Transaction management
+
+#### Completed Modules:
+1. **EVM Types** (`src/chains/evm/types.ts`)
+   - Comprehensive type definitions for EVM interactions
+   - IEvmClient and IHTLCManager interfaces
+   - Transaction, receipt, and event types
+   - HTLCState and HTLCEventType enums
+   
+2. **EVM Client** (`src/chains/evm/client.ts`)
+   - EvmClient implementation using viem
+   - Support for HTTP and WebSocket connections
+   - Transaction sending and monitoring
+   - Event subscription capabilities
+   - Retry logic with exponential backoff
+   
+3. **HTLC Manager** (`src/chains/evm/htlc.ts`)
+   - HTLCManager for HTLC operations
+   - Create HTLCs via factory contract
+   - Withdraw and refund operations
+   - Event monitoring and filtering
+   - Cross-chain address conversion (bytes32)
+   
+4. **Mock Client** (`src/chains/evm/mock_client.ts`)
+   - MockEvmClient for testing without network calls
+   - Simulates all EVM client operations
+   - Supports subscription testing
 
 ### Phase 3: Coordinator Logic
 - [ ] Swap state machine
@@ -497,10 +523,10 @@ bl-cli/
 │   ├── crypto/         ✅ Complete
 │   ├── config/         ✅ Complete
 │   ├── utils/          ✅ Complete
-│   ├── chains/         📝 Next priority
-│   │   ├── evm/       
-│   │   └── solana/    
-│   └── coordinator/    
+│   ├── chains/         
+│   │   ├── evm/        ✅ Complete
+│   │   └── solana/     ⏸️ Deferred (no SVM contracts)
+│   └── coordinator/    📝 Next priority
 ├── abi/                ✅ Contract ABIs present
 ├── .env                ✅ Configured with deployed contracts
 └── deno.json          ✅ Configured
