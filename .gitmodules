@@ -1,3 +1,7 @@
 [submodule "bl-evm/lib/forge-std"]
 	path = bl-evm/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "cross-chain-swap"]
+	path = cross-chain-swap
+	url = https://github.com/bioharz/cross-chain-swap
+	branch = feature/eth-solana-atomic-swap
