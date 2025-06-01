@@ -180,7 +180,8 @@ Using a factory pattern for better isolation and security in our proof of concep
    ```
 
 4. **HTLC ID Generation**
-   - `htlcId = keccak256(abi.encodePacked(sender, recipient, token, amount, hashlock, timelock, block.timestamp))`
+   - `htlcId = keccak256(abi.encodePacked(resolver, srcAddress, dstAddress, srcToken, dstToken, amount, hashlock, block.timestamp))`
+   - Includes both source and destination tokens for uniqueness
    - Used for cross-chain coordination
    - Stored in factory registry
 
@@ -197,6 +198,8 @@ Using a factory pattern for better isolation and security in our proof of concep
   - Cancellation period: Return funds if swap failed
 - SafeTransferFrom for ERC20 operations
 - Resolver must provide tokens upfront (not pull from maker)
+- Validation of both srcToken and dstToken (non-zero addresses)
+- dstToken included in HTLC ID to prevent token mismatch attacks
 
 ### Testing Strategy
 
@@ -246,10 +249,10 @@ Using a factory pattern for better isolation and security in our proof of concep
 7. ✅ Added NatSpec documentation to all contracts and interfaces
 8. ✅ Verified gas costs are acceptable for PoC
 
-### Gas Costs (Optimized)
-With Solidity optimizer enabled (800 runs):
-- **HTLC Deployment**: ~712k gas (35% reduction from unoptimized)
-- **HTLCFactory Deployment**: ~1.15M gas
+### Gas Costs (Optimized with dstToken)
+With Solidity optimizer enabled (800 runs) and cross-chain token support:
+- **HTLC Deployment**: ~747k gas (includes dstToken storage)
+- **HTLCFactory Deployment**: ~1.10M gas
 - **Token Deployment**: ~732k gas
 - **HTLC Operations**:
   - Withdraw: ~57k gas
@@ -286,11 +289,12 @@ With Solidity optimizer enabled (800 runs):
    - Execute withdrawals during exclusive period
 
 ### Additional Factory Pattern Considerations
-- Gas cost for deployment: ~712k gas per HTLC with optimizer (acceptable for PoC)
+- Gas cost for deployment: ~747k gas per HTLC with optimizer and dstToken (acceptable for PoC)
 - Each HTLC is independent - failure of one doesn't affect others
 - Factory upgrade path: deploy new factory, migrate coordinator
 - HTLCs are minimal - only essential functions to reduce deployment cost
 - No safety deposits in PoC - simplified economics
+- Cross-chain token mapping handled on-chain (not external)
 
 ### Key Implementation Insights
 1. **Interface-First Development**: All contracts implement well-defined interfaces
@@ -310,13 +314,20 @@ With Solidity optimizer enabled (800 runs):
    - Public withdrawal assistance works as designed
    - Cancellation mechanism protects against failed swaps
 
-### Critical Update Required: Cross-Chain Token Specification
-**Issue**: Current implementation only stores the source (EVM) token address but not the destination (Solana) token mint address. This is required for the coordinator to know which SPL token to release on Solana.
+### Cross-Chain Token Specification ✅
+**Issue Resolved**: The implementation now properly stores both source and destination token addresses.
 
-**Solution**: Add `dstToken` parameter to store the Solana SPL token mint address:
-- Update HTLC to store both `srcToken` (EVM) and `dstToken` (Solana)
-- Update HTLCFactory to accept both token addresses
-- Update all tests to provide Solana token mint addresses
-- Update HTLC ID generation to include both tokens
+**Implementation Details**:
+- HTLC stores both `srcToken` (EVM address) and `dstToken` (Solana SPL token mint as bytes32)
+- HTLCFactory validates both tokens and includes `dstToken` in HTLC ID generation
+- All tests use example Solana token addresses (e.g., `SOLANA_USDC`)
+- No backward compatibility needed since this is a PoC
 
-This ensures the bridge can properly map between different token representations on each chain (e.g., USDC on Ethereum → USDC on Solana).
+**Token Mapping Example**:
+```solidity
+// EVM USDC → Solana USDC
+srcToken: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48  // USDC on Ethereum
+dstToken: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  // USDC on Solana (stored as bytes32)
+```
+
+This ensures the coordinator knows exactly which token to release on each chain.
