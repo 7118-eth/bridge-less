@@ -1,2 +1,5 @@
 svm-examples
 .DS_Store
+*.idea
+.idea
+.idea/vcs.xml
