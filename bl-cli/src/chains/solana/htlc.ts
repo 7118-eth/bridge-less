@@ -9,13 +9,13 @@ import {
   TransactionInstruction,
   SystemProgram,
   SYSVAR_CLOCK_PUBKEY,
-} from "npm:@solana/web3.js@2";
+} from "npm:@solana/web3.js@1.95";
 import {
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
-} from "npm:@solana/spl-token@0.4";
-import { BorshCoder } from "npm:@coral-xyz/anchor@0.30.1";
+} from "npm:@solana/spl-token@0.3";
+import { BorshCoder } from "npm:@coral-xyz/anchor@0.29";
 import type {
   ISolanaHTLCManager,
   ISolanaClient,
@@ -77,7 +77,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
   async createHTLC(params: CreateHTLCParams): Promise<CreateHTLCResult> {
     try {
       // Derive HTLC PDA
-      const [htlcPda, bump] = await PublicKey.findProgramAddressSync(
+      const [htlcPda, bump] = PublicKey.findProgramAddressSync(
         [Buffer.from("htlc"), params.htlcId],
         this.programId
       );
@@ -94,7 +94,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
       );
       
       // Derive HTLC vault PDA
-      const [htlcVault] = await PublicKey.findProgramAddressSync(
+      const [htlcVault] = PublicKey.findProgramAddressSync(
         [
           htlcPda.toBuffer(),
           TOKEN_PROGRAM_ID.toBuffer(),
@@ -179,7 +179,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
   ): Promise<string> {
     try {
       // Derive HTLC PDA
-      const [htlcPda] = await PublicKey.findProgramAddressSync(
+      const [htlcPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("htlc"), htlcId],
         this.programId
       );
@@ -196,7 +196,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
       );
       
       // Derive HTLC vault PDA
-      const [htlcVault] = await PublicKey.findProgramAddressSync(
+      const [htlcVault] = PublicKey.findProgramAddressSync(
         [
           htlcPda.toBuffer(),
           TOKEN_PROGRAM_ID.toBuffer(),
@@ -265,7 +265,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
   async cancel(htlcId: Uint8Array): Promise<string> {
     try {
       // Derive HTLC PDA
-      const [htlcPda] = await PublicKey.findProgramAddressSync(
+      const [htlcPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("htlc"), htlcId],
         this.programId
       );
@@ -290,7 +290,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
       );
       
       // Derive HTLC vault PDA
-      const [htlcVault] = await PublicKey.findProgramAddressSync(
+      const [htlcVault] = PublicKey.findProgramAddressSync(
         [
           htlcPda.toBuffer(),
           TOKEN_PROGRAM_ID.toBuffer(),
@@ -355,7 +355,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
   async getHTLCState(htlcId: Uint8Array): Promise<HTLCState | null> {
     try {
       // Derive HTLC PDA
-      const [htlcPda] = await PublicKey.findProgramAddressSync(
+      const [htlcPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("htlc"), htlcId],
         this.programId
       );
@@ -438,7 +438,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
   }
 
   async getHTLCAddress(htlcId: Uint8Array): Promise<string> {
-    const [htlcPda] = await PublicKey.findProgramAddressSync(
+    const [htlcPda] = PublicKey.findProgramAddressSync(
       [Buffer.from("htlc"), htlcId],
       this.programId
     );
