@@ -281,15 +281,99 @@ pub struct HTLCCancelled {
    - PDA collision scenarios (htlc_id uniqueness)
 
 ### Implementation Status
-1. ⏳ Create modular instruction structure
-2. ⏳ Implement HTLC state in `state.rs`
-3. ⏳ Implement create_htlc instruction
-4. ⏳ Implement withdraw instruction
-5. ⏳ Implement cancel instruction
-6. ⏳ Write comprehensive test suite
+1. ✅ Create modular instruction structure
+2. ✅ Implement HTLC state in `state.rs`
+3. ✅ Implement create_htlc instruction
+4. ✅ Implement withdraw instruction
+5. ✅ Implement cancel instruction
+6. ✅ Write comprehensive test suite
 7. ⏳ Add bankrun tests for faster development
 8. ⏳ Test with SPL Token integration
 9. ⏳ Verify cross-chain ID compatibility
+
+### Current Status (as of last commit)
+- **Program ID**: `7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY`
+- **Build Status**: ✅ Successfully compiling with Anchor 0.31.1
+- **Test Status**: 6/10 tests passing
+  - ✅ HTLC creation tests
+  - ✅ Invalid parameter validation tests  
+  - ✅ Concurrent HTLC handling
+  - ❌ 4 tests failing due to blockchain time synchronization issues
+- **Dependencies**: 
+  - `anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }`
+  - `anchor-spl = { version = "0.31.1", features = ["token"] }`
+  - Test dependencies include `@solana/spl-token` for token operations
+
+### Known Issues & Solutions
+1. **Timing Issues in Tests**: Tests use `Math.floor(Date.now() / 1000)` but blockchain time may differ
+   - Solution: Use bankrun tests or add buffer time for blockchain latency
+   - Alternative: Query blockchain clock before creating HTLCs
+
+2. **Import Warnings**: Tests show ES module warnings
+   - Solution: Either add `"type": "module"` to package.json or use .mjs extension
+   - Current approach: Keep CommonJS for compatibility
+
+3. **Borrow Checker**: Had to carefully manage mutable borrows in instruction handlers
+   - Solution: Extract values before borrowing mutably for account transfers
+
+### Critical Implementation Details
+1. **Account Contexts in lib.rs**: Due to Anchor macro requirements, account contexts must be defined in lib.rs, not in separate instruction files
+2. **Token Vault Pattern**: Each HTLC owns its associated token account as a PDA
+3. **Safety Deposit Transfers**: Use direct lamport manipulation for SOL transfers
+4. **PDA Seeds**: `[b"htlc", htlc_id]` for HTLC account (vault uses associated token account)
+5. **Feature Flags**: Must enable `init-if-needed` for creating token accounts and `idl-build` for both anchor-lang and anchor-spl
+
+### Next Steps
+1. **Fix Timing Issues**: 
+   - Implement bankrun tests for precise time control
+   - Or query blockchain time before setting deadlines
+   
+2. **Integration Testing**:
+   - Test with actual SPL token mints
+   - Verify cross-chain ID generation matches EVM side
+   - Test event parsing for coordinator integration
+
+3. **Coordinator Integration**:
+   - Implement event listeners in coordinator
+   - Add HTLC ID mapping between chains
+   - Test full cross-chain swap flow
+
+4. **Production Readiness**:
+   - Add rate limiting mechanisms
+   - Implement account cleanup for expired HTLCs
+   - Add monitoring for MEV-style attacks
+   - Consider upgrade authority management
+
+### Deployment Notes
+- Program deployed to localnet at `7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY`
+- Update both `lib.rs` and `Anchor.toml` when program ID changes
+- Use `anchor deploy --provider.cluster devnet` for devnet deployment
+- Remember to fund program upgrade authority for future updates
+
+### Critical Lessons Learned
+1. **Anchor Macro Limitations**: The `#[program]` macro requires all instruction contexts to be accessible at compile time. Initially tried modular pattern with contexts in separate files, but had to move them to lib.rs
+2. **Cargo Features**: Missing `init-if-needed` feature causes cryptic errors. Always check Cargo.toml features match your usage
+3. **IDL Build**: Must add `anchor-spl/idl-build` to features list to avoid "DISCRIMINATOR not found" errors
+4. **Import Order**: Had to use `import * as crypto from "crypto"` in tests instead of default import
+5. **Associated Token Accounts**: The HTLC vault is created as an associated token account with the HTLC PDA as authority - this simplifies the seed derivation
+
+### Architecture Decisions
+1. **Why PDA for Each HTLC**: Unlike EVM's factory pattern, Solana's account model makes individual PDAs more efficient
+2. **Token Vault Ownership**: HTLC PDA owns the vault, not the resolver, ensuring only the program can transfer funds
+3. **Safety Deposits in SOL**: Using native SOL instead of tokens simplifies the incentive mechanism
+4. **Event Design**: Including EVM addresses as byte arrays in events helps coordinator track cross-chain state
+
+### Testing Insights
+- Use `anchor test --skip-local-validator` when validator is already running
+- Program ID mismatches are common - always check deployed ID matches code
+- Timing tests are tricky on local validator - consider mocking time or using bankrun
+- SPL token setup in tests requires creating mint, then token accounts, then minting
+
+### File Structure Best Practices
+- Keep instruction handlers minimal - just parameter validation and state updates
+- Put complex logic in separate functions for testability
+- Use descriptive error messages - they help during testing
+- Document PDA derivation clearly - it's critical for client integration
 
 ### Estimated Transaction Costs
 Based on Solana's account model:
