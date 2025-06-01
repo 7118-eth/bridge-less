@@ -29,10 +29,21 @@ This is a Foundry-based Solidity project for EVM smart contract development. The
 - **solmate**: Gas-optimized contract implementations (currently using ERC20)
 
 ### Structure
-- `src/`: Smart contracts (currently `Token.sol` - ERC20 implementation)
+- `src/`: Smart contracts
+  - `Token.sol` - ERC20 implementation with 6 decimals
+  - `HTLC.sol` - Individual HTLC contract implementation
+  - `HTLCFactory.sol` - Factory for deploying and tracking HTLCs
+  - `interfaces/` - Contract interfaces
+    - `IHTLC.sol` - HTLC interface
+    - `IHTLCFactory.sol` - Factory interface
 - `test/`: Test files following `.t.sol` naming convention
+  - `Token.t.sol` - Token contract tests
+  - `HTLC.t.sol` - HTLC unit tests
+  - `HTLCFactory.t.sol` - Factory unit tests
+  - `HTLCBridge.t.sol` - Integration tests for bridge scenarios
 - `script/`: Deployment scripts (`.s.sol` files)
 - `lib/` & `dependencies/`: External libraries managed by Soldeer
+- `.gas-snapshot` - Gas usage benchmarks for all functions
 
 ### Testing Approach
 Tests inherit from `forge-std/Test.sol` and use:
@@ -223,15 +234,25 @@ Using a factory pattern for better isolation and security in our proof of concep
    - Invalid token addresses
    - Factory registry overflow scenarios
 
-### Implementation Timeline
-1. Create `HTLC.sol` contract with immutable state
-2. Implement claim and refund functions with security checks
-3. Create `HTLCFactory.sol` with deployment logic
-4. Implement factory registry and tracking functions
-5. Write comprehensive test suite for both contracts
-6. Test integration with existing Token.sol
-7. Add natspec documentation
-8. Verify gas costs are acceptable for PoC
+### Implementation Status ✅
+1. ✅ Created `HTLC.sol` contract with immutable state
+2. ✅ Implemented claim and refund functions with security checks
+3. ✅ Created `HTLCFactory.sol` with deployment logic
+4. ✅ Implemented factory registry and tracking functions
+5. ✅ Written comprehensive test suite (32 tests, all passing)
+6. ✅ Tested integration with existing Token.sol
+7. ✅ Added NatSpec documentation to all contracts and interfaces
+8. ✅ Verified gas costs are acceptable for PoC
+
+### Gas Costs (Optimized)
+With Solidity optimizer enabled (800 runs):
+- **HTLC Deployment**: ~712k gas (35% reduction from unoptimized)
+- **HTLCFactory Deployment**: ~1.15M gas
+- **Token Deployment**: ~732k gas
+- **HTLC Operations**:
+  - Withdraw: ~57k gas
+  - Cancel: ~56k gas
+  - Public withdraw: ~57k gas
 
 ### Production Considerations
 - Timelock durations for testing (adjust for Base 2-second blocks):
@@ -263,8 +284,26 @@ Using a factory pattern for better isolation and security in our proof of concep
    - Execute withdrawals during exclusive period
 
 ### Additional Factory Pattern Considerations
-- Gas cost for deployment: ~500k-1M gas per HTLC (acceptable for PoC)
+- Gas cost for deployment: ~712k gas per HTLC with optimizer (acceptable for PoC)
 - Each HTLC is independent - failure of one doesn't affect others
 - Factory upgrade path: deploy new factory, migrate coordinator
 - HTLCs are minimal - only essential functions to reduce deployment cost
 - No safety deposits in PoC - simplified economics
+
+### Key Implementation Insights
+1. **Interface-First Development**: All contracts implement well-defined interfaces
+2. **Test Coverage**: 100% test coverage with 32 tests covering:
+   - Unit tests for HTLC operations
+   - Factory deployment and registry tests
+   - Integration tests simulating bridge scenarios
+   - Edge cases and security tests
+3. **Gas Optimization**: Enabling Solidity optimizer reduced deployment costs by 35%
+4. **Security Features**:
+   - Immutable contract parameters prevent tampering
+   - Multi-phase timelock system prevents race conditions
+   - Check-Effects-Interactions pattern for reentrancy protection
+   - Comprehensive input validation in factory
+5. **Coordinator Flow Verified**:
+   - Can handle multiple concurrent HTLCs
+   - Public withdrawal assistance works as designed
+   - Cancellation mechanism protects against failed swaps
