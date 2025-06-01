@@ -332,53 +332,78 @@ dstToken: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  // USDC on Solana (sto
 
 This ensures the coordinator knows exactly which token to release on each chain.
 
-### Known Limitations & Production Considerations ⚠️
+### Known Limitations & How FusionPlus Addresses Them ⚠️
 
 **1. HTLC ID Generation Issues**:
-- Uses `keccak256` which is not available on Solana (Solana uses SHA256)
-- Includes `block.timestamp` which will differ between chains
-- Cannot generate matching IDs on both chains
-- **Production Fix**: Use SHA256 with chain-agnostic data (hashlock + amount + nonce)
+- **Current Problem**: Uses `keccak256` which is not available on Solana
+- **FusionPlus Solution**: Not relevant - FusionPlus doesn't require matching IDs across chains. The resolver handles both sides independently, using the same secret hash
 
-**2. Centralized Coordinator Risks**:
-- Single point of failure - if coordinator goes offline, swaps fail
-- Coordinator holds all liquidity and secrets
-- No slashing or penalties for misbehavior
-- Trust assumptions: users must trust coordinator won't steal funds
-- **Production Fix**: Implement decentralized coordinator network with staking/slashing
+**2. Centralized Coordinator/Resolver Risks**:
+- **Current Problem**: Single point of failure, trust assumptions
+- **FusionPlus Solution**: 
+  - Multiple whitelisted resolvers compete via Dutch auction
+  - KYC/KYB requirements and legal agreements with 1inch
+  - Safety deposits incentivize proper behavior
+  - Any resolver can complete abandoned swaps after timeouts
 
 **3. Cross-Chain Synchronization**:
-- No direct chain communication - relies entirely on coordinator
-- No on-chain verification that matching HTLC exists on other chain
-- Coordinator could create mismatched HTLCs (different amounts/tokens)
-- **Production Fix**: Add merkle proofs or oracle-based verification
+- **Current Problem**: No on-chain verification of matching escrows
+- **FusionPlus Solution**: 
+  - 1inch relayer service verifies both escrows before releasing secret
+  - Finality locks prevent reorg attacks
+  - Secret only shared after verification of both escrows
 
-**4. Token Decimal Handling**:
-- No decimal conversion logic between chains
-- EVM tokens: 0-18 decimals, Solana typically: 6-9 decimals
-- Could lead to amount mismatches
-- **Production Fix**: Add decimal normalization in coordinator logic
+**4. Secret Management**:
+- **Current Problem**: Coordinator holds secret with no guarantees
+- **FusionPlus Solution**:
+  - Maker's frontend stores secret until escrows verified
+  - 1inch relayer acts as conditional transmitter
+  - Merkle tree of secrets for partial fills
+  - Secret revealed only after finality locks expire
 
-**5. Limited Token Support**:
-- No whitelist or validation of token pairs
-- No mechanism to add new token mappings
-- Manual token address management
-- **Production Fix**: On-chain token registry with governance
+**5. Unresponsive Participants**:
+- **Current Problem**: Swap can get stuck if coordinator disappears
+- **FusionPlus Solution**:
+  - Resolver exclusive period, then public period
+  - Safety deposits incentivize any resolver to complete
+  - Cancellation mechanisms with tiered access
 
-**6. Timelock Limitations**:
-- Fixed timelock periods don't account for chain congestion
-- No adjustment for different block times between chains
-- **Production Fix**: Dynamic timelocks based on chain conditions
+**6. Timelock Complexity**:
+- **Current Problem**: Fixed timelocks don't adapt to chain conditions
+- **FusionPlus Solution**: 
+  - Chain-specific finality locks (prevent reorgs)
+  - Resolver exclusive period (incentivized completion)
+  - Public withdrawal period (anyone can help)
+  - Cancellation period (asset recovery)
 
-**7. No Fee Mechanism**:
-- Coordinator has no incentive to operate
-- No protocol fees for sustainability
-- **Production Fix**: Add coordinator fees and protocol treasury
+**7. No Incentive Mechanism**:
+- **Current Problem**: No reason for coordinator to operate
+- **FusionPlus Solution**:
+  - Dutch auction creates profit opportunities
+  - Safety deposits reward executors
+  - Resolver fees (DAO configurable)
+  - Competition ensures best rates
 
-**8. Missing Safety Features**:
-- No pause mechanism for emergencies
-- No upgrade path for bug fixes
-- No maximum swap limits
-- **Production Fix**: Add pausability, upgradability, and risk limits
+**8. Missing Governance Features**:
+- **Current Problem**: No upgrade path or emergency controls
+- **FusionPlus Solution**:
+  - DAO controls fee structure
+  - DAO sets maximum swap amounts (initially limited)
+  - Gradual lifting of restrictions as protocol matures
 
-These limitations are acceptable for a PoC but MUST be addressed before production deployment.
+**Key Insight**: FusionPlus doesn't try to create a trustless atomic swap. Instead, it creates a trust-minimized system with economic incentives, legal agreements, and competition among professional resolvers. The maker experience is completely passive after signing the order.
+
+### What We Simplified for the PoC
+
+Our implementation is a minimal proof of concept that demonstrates the core HTLC mechanics:
+
+1. **No Dutch Auction**: Fixed price swaps only
+2. **No Safety Deposits**: Simplified economics
+3. **No Partial Fills**: Complete swaps only
+4. **No Merkle Tree of Secrets**: Single secret per swap
+5. **No Resolver Competition**: Single coordinator
+6. **No Relayer Service**: Coordinator handles everything
+7. **No DAO Governance**: No fee or limit controls
+8. **No KYC/Legal Framework**: Pure technical demo
+
+These simplifications are appropriate for demonstrating the cross-chain HTLC concept but would need to be implemented for a production FusionPlus system.
