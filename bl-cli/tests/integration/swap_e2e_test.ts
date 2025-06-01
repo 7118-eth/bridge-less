@@ -154,12 +154,10 @@ Deno.test("integration: end-to-end swap EVM to SVM", async () => {
   
   // Step 3: Create swap request
   const swapRequest: SwapRequest = {
-    sourceChain: ChainType.EVM,
-    destinationChain: ChainType.SVM,
-    sourceTokenAddress: config.evm.tokenContractAddress,
-    destinationTokenAddress: config.svm.tokenContractAddress || "mock",
-    sourceAddress: userAccount.address,
-    destinationAddress: config.svm.userPrivateKey || "mock",
+    from: ChainType.EVM,
+    to: ChainType.Solana,
+    sender: userAccount.address,
+    receiver: config.svm.userPrivateKey || "mock",
     amount: 1000000n, // 1 token (6 decimals)
   };
   
@@ -297,12 +295,10 @@ Deno.test("integration: swap with insufficient balance", async () => {
   // Create swap request with huge amount
   const userAccount = privateKeyToAccount(config.evm.userPrivateKey as `0x${string}`);
   const swapRequest: SwapRequest = {
-    sourceChain: ChainType.EVM,
-    destinationChain: ChainType.SVM,
-    sourceTokenAddress: config.evm.tokenContractAddress,
-    destinationTokenAddress: config.svm.tokenContractAddress || "mock",
-    sourceAddress: userAccount.address,
-    destinationAddress: config.svm.userPrivateKey || "mock",
+    from: ChainType.EVM,
+    to: ChainType.Solana,
+    sender: userAccount.address,
+    receiver: config.svm.userPrivateKey || "mock",
     amount: 999999999999999999n, // Huge amount that exceeds balance
   };
   
