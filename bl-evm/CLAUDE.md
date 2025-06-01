@@ -45,11 +45,17 @@ The project appears to be part of a "bridge-less" solution for 1inch protocol, c
 ## HTLC Bridge Implementation Plan
 
 ### Overview
-Building a trustless bridge between EVM and Solana using Hashed Timelock Contracts (HTLCs). The bridge operates with liquidity providers on both chains, coordinated by an external CLI tool.
+Building a minimal FusionPlus-inspired bridge between EVM and Solana. Based on 1inch's atomic swap approach where a resolver (our coordinator) manages the entire swap process.
+
+**Key Differences from Classic Atomic Swaps:**
+- Coordinator acts as maker, taker, resolver, and relayer (for PoC simplicity)
+- Coordinator holds the secret and reveals it after both escrows are created
+- Coordinator creates BOTH escrows (source and destination)
+- No Dutch auction for PoC - fixed price swaps
 
 **Token Setup:**
 - Token uses 6 decimals (1 token = 1e6 units)
-- Liquidity providers pre-fund 10,000 tokens (10_000e6 units) on each chain
+- Coordinator pre-funds 10,000 tokens (10_000e6 units) on each chain
 - Individual swaps use 1 token (1e6 units) for testing
 
 ### Core Design Decisions
@@ -66,38 +72,47 @@ Using a factory pattern for better isolation and security in our proof of concep
 1. **HTLCFactory.sol** - Factory contract that deploys and tracks HTLCs
    ```solidity
    // Factory state
-   mapping(address => address[]) public userHTLCs;  // Track HTLCs by creator
-   mapping(bytes32 => address) public htlcRegistry; // Map ID to HTLC contract
-   address[] public allHTLCs;                       // All deployed HTLCs
+   mapping(address => address[]) public resolverHTLCs;  // Track HTLCs by resolver
+   mapping(bytes32 => address) public htlcRegistry;    // Map ID to HTLC contract
+   address[] public allHTLCs;                          // All deployed HTLCs
    
-   // Main function
+   // Main function (FusionPlus style - resolver creates escrow)
    function createHTLC(
-       bytes32 recipient,      // Solana address
+       address srcAddress,     // Maker's address (source of funds)
+       bytes32 dstAddress,     // Maker's Solana address (destination)
        address token,          // ERC20 token
        uint256 amount,         // Token amount
        bytes32 hashlock,       // SHA256 hash
-       uint256 timelock        // Unix timestamp
-   ) external returns (address htlcContract, bytes32 htlcId);
+       uint256 safetyDeposit   // Native token deposit
+   ) external payable returns (address htlcContract, bytes32 htlcId);
    ```
 
-2. **HTLC.sol** - Individual HTLC contract
+2. **HTLC.sol** - Individual HTLC contract (FusionPlus style)
    ```solidity
    // Immutable state (set in constructor)
    address public immutable factory;
-   address public immutable sender;
-   bytes32 public immutable recipient;  // Solana address
+   address public immutable resolver;     // Who creates the escrow (coordinator)
+   address public immutable srcAddress;   // Source of funds (maker on source chain)
+   bytes32 public immutable dstAddress;   // Recipient (maker's Solana address)
    address public immutable token;
    uint256 public immutable amount;
    bytes32 public immutable hashlock;
-   uint256 public immutable timelock;
+   uint256 public immutable safetyDeposit;  // Native token incentive
+   
+   // Timelock structure (FusionPlus style)
+   uint256 public immutable finalityDeadline;    // When secret can be revealed
+   uint256 public immutable resolverDeadline;    // Exclusive resolver withdraw period
+   uint256 public immutable publicDeadline;      // Anyone can withdraw for maker
+   uint256 public immutable cancellationDeadline; // Refund to resolver
    
    // Mutable state
    bool public withdrawn;
-   bool public refunded;
+   bool public cancelled;
    
    // Core functions
-   function claim(bytes32 preimage) external;
-   function refund() external;
+   function withdrawToDestination(bytes32 preimage) external;  // For resolver
+   function publicWithdraw(bytes32 preimage) external;         // For anyone after resolver deadline
+   function cancel() external;                                  // Return funds to srcAddress
    ```
 
 3. **Events for Coordinator**
@@ -106,24 +121,28 @@ Using a factory pattern for better isolation and security in our proof of concep
    event HTLCDeployed(
        address indexed htlcContract,
        bytes32 indexed htlcId,
-       address indexed sender,
-       bytes32 recipient,
+       address indexed resolver,
+       address srcAddress,
+       bytes32 dstAddress,
        address token,
        uint256 amount,
        bytes32 hashlock,
-       uint256 timelock
+       uint256 safetyDeposit,
+       uint256 finalityDeadline
    );
    
    // HTLC contract events
-   event HTLCClaimed(
+   event HTLCWithdrawn(
        address indexed htlcContract,
        bytes32 preimage,
-       address claimant
+       address executor,      // Who executed the withdrawal
+       uint256 safetyDeposit  // Amount claimed by executor
    );
    
-   event HTLCRefunded(
+   event HTLCCancelled(
        address indexed htlcContract,
-       address sender
+       address executor,
+       uint256 safetyDeposit
    );
    ```
 
@@ -137,11 +156,15 @@ Using a factory pattern for better isolation and security in our proof of concep
 - Factory-only deployment (HTLCs can only be created through factory)
 - Immutable HTLC parameters prevent tampering
 - Check-Effects-Interactions pattern for token transfers
-- Validate hashlock matches SHA256(preimage) on claim
-- Enforce timelock strictly (no early refunds)
+- Validate hashlock matches SHA256(preimage) on withdraw
+- Multi-phase timelock system (FusionPlus style):
+  - Finality period: No operations allowed (prevent reorg attacks)
+  - Resolver exclusive period: Only resolver can withdraw
+  - Public period: Anyone can help complete the swap
+  - Cancellation period: Return funds if swap failed
 - SafeTransferFrom for ERC20 operations
-- Factory cannot interfere with individual HTLC operations
-- Each HTLC holds tokens directly (no central pool)
+- Safety deposits incentivize proper execution
+- Resolver must provide tokens upfront (not pull from maker)
 
 ### Testing Strategy
 
@@ -192,23 +215,37 @@ Using a factory pattern for better isolation and security in our proof of concep
 8. Verify gas costs are acceptable for PoC
 
 ### Production Considerations
-- 10-minute recovery timer (600 seconds) for testing
-- Adjust timelock for Base network (2-second block time)
+- Timelock durations for testing (adjust for Base 2-second blocks):
+  - Finality period: 30 seconds (prevent reorgs)
+  - Resolver exclusive: 60 seconds
+  - Public withdrawal: 300 seconds (5 minutes)
+  - Cancellation deadline: 600 seconds (10 minutes)
+- Safety deposit: 0.001 ETH (enough to incentivize execution)
 - Consider adding pause mechanism for emergencies
-- Add owner functions for fee collection (if needed)
-- Monitor for front-running on claims
+- Monitor for front-running during public withdrawal period
 
-### Coordinator Integration Points
-- Listen to HTLCDeployed events from factory to trigger Solana-side creation
-- Store mapping of htlcId to contract address for tracking
-- Monitor HTLCClaimed events from individual HTLC contracts
-- Track HTLCRefunded events for liquidity management
-- Use htlcId as cross-chain identifier
-- Query factory for active HTLCs via getUserHTLCs and htlcRegistry
+### Coordinator Integration Points (FusionPlus Flow)
+1. **Swap Initiation**:
+   - Coordinator generates secret and computes SHA256 hash
+   - Creates HTLC on source chain (EVM) with maker's tokens
+   - Creates HTLC on destination chain (Solana) with resolver's tokens
+   
+2. **Secret Management**:
+   - Coordinator holds secret until both HTLCs pass finality period
+   - Reveals secret only after verifying both escrows exist
+   
+3. **Completion**:
+   - Withdraws on source chain (gets maker's tokens + safety deposit)
+   - Withdraws on destination chain (sends tokens to maker's Solana address)
+   
+4. **Monitoring**:
+   - Track HTLCDeployed events for htlcId mapping
+   - Monitor finality deadlines before revealing secret
+   - Execute withdrawals during exclusive period
 
 ### Additional Factory Pattern Considerations
 - Gas cost for deployment: ~500k-1M gas per HTLC (acceptable for PoC)
 - Each HTLC is independent - failure of one doesn't affect others
 - Factory upgrade path: deploy new factory, migrate coordinator
-- Consider using CREATE2 for deterministic addresses (optional)
 - HTLCs are minimal - only essential functions to reduce deployment cost
+- Coordinator needs ETH balance for safety deposits
