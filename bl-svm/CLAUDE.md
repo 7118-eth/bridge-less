@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Test (skip deploy)**: `anchor test --skip-deploy` - Runs tests without deploying
 - **Test (skip local validator)**: `anchor test --skip-local-validator` - Uses existing validator
 - **Test (specific)**: `pnpm test tests/<filename>` - Run specific test file
-- **Test (bankrun)**: `pnpm test tests/bankrun.test.ts` - Run bankrun tests (faster)
+- **Test (litesvm)**: `pnpm test tests/litesvm.test.ts` - Run LiteSVM tests (faster and more ergonomic)
 
 ### Code Quality
 - **Format**: `cargo fmt` - Formats Rust code according to style guide
@@ -40,7 +40,7 @@ This is an Anchor-based Solana program for smart contract development on Solana 
 - **anchor-lang**: Core Anchor functionality and macros
 - **anchor-spl**: Integration with Solana Program Library (SPL) for tokens
 - **solana-program**: Low-level Solana runtime interfaces
-- **bankrun**: Fast in-process testing framework (alternative to solana-test-validator)
+- **litesvm**: Fast and ergonomic in-process testing framework (superior alternative to solana-test-validator and bankrun)
 
 ### Structure
 - `programs/bl-svm/src/`: Solana program source code
@@ -54,7 +54,7 @@ This is an Anchor-based Solana program for smart contract development on Solana 
     - `mod.rs` - Module exports
 - `tests/`: TypeScript test files
   - `bl-svm.ts` - Standard integration tests
-  - `bankrun.test.ts` - Fast bankrun tests
+  - `litesvm.test.ts` - Fast LiteSVM tests
 - `migrations/`: Deployment and migration scripts
 - `target/`: Build artifacts (generated)
   - `idl/` - Interface Definition Language files
@@ -63,10 +63,11 @@ This is an Anchor-based Solana program for smart contract development on Solana 
 
 ### Testing Approach
 Tests use Anchor's testing framework with:
-- Local validator or bankrun for fast execution
+- Local validator or LiteSVM for fast execution
 - `@coral-xyz/anchor` for program interaction
 - `chai` for assertions
 - Deterministic account derivation via PDAs
+- LiteSVM provides faster and more ergonomic testing than bankrun
 
 **Development Process (mandatory for this project):**
 
@@ -78,7 +79,7 @@ Tests use Anchor's testing framework with:
 
 2. **Test-Driven Development (TDD):**
    - Write TypeScript tests based on expected behavior BEFORE implementation
-   - Use bankrun tests for rapid iteration during development
+   - Use LiteSVM tests for rapid iteration during development
    - Run tests to see them fail (red phase)
    - Write minimal code to make tests pass (green phase)
    - Refactor while keeping tests green
@@ -259,11 +260,13 @@ pub struct HTLCCancelled {
    - Test with 1 token swaps (1e6 units with 6 decimals)
    - Test timelock validation and ordering
 
-2. **Bankrun Tests** (`tests/bankrun.test.ts`)
-   - Faster test execution without full validator
+2. **LiteSVM Tests** (`tests/litesvm.test.ts`)
+   - Significantly faster test execution than solana-test-validator
+   - More ergonomic API than bankrun
    - Same test coverage as standard tests
    - Better for rapid development iteration
-   - Time manipulation for testing timelocks
+   - Built-in time manipulation for testing timelocks
+   - Native TypeScript/JavaScript support
 
 3. **Integration Tests**
    - Pre-fund coordinator with 10k tokens (10_000e6 units)
@@ -288,7 +291,7 @@ pub struct HTLCCancelled {
 5. ✅ Implement cancel instruction
 6. ✅ Write comprehensive test suite
 7. ✅ Resolve all test timing issues
-8. ⏳ Add bankrun tests for faster development
+8. ⏳ Add LiteSVM tests for faster development
 9. ✅ Test with SPL Token integration (working in current tests)
 10. ⏳ Verify cross-chain ID compatibility with EVM coordinator
 11. ⏳ Integrate with coordinator CLI
@@ -342,7 +345,7 @@ pub struct HTLCCancelled {
    - Test end-to-end swap scenario
 
 3. **Development Environment Enhancements**:
-   - Add bankrun tests for faster development iteration
+   - Add LiteSVM tests for faster development iteration
    - Consider adding `"type": "module"` to package.json to eliminate warnings
    - Set up devnet deployment and testing
 
@@ -457,13 +460,41 @@ Based on Solana's account model:
 
 **For this project, we'll use:**
 1. **Standard Anchor Tests** (`anchor test`) for comprehensive integration testing
-2. **Bankrun Tests** for rapid development and unit testing
+2. **LiteSVM Tests** for rapid development and unit testing
 3. **Mollusk** (optional) for performance-critical instruction testing
 
 **Rationale:**
-- Bankrun provides the best balance of speed and functionality
+- LiteSVM provides superior speed and ergonomics compared to bankrun and solana-test-validator
 - Standard tests ensure compatibility with real validator behavior
 - Both support time manipulation for testing timelocks
+- LiteSVM has native TypeScript/JavaScript support for better developer experience
+
+### LiteSVM Migration Notes
+
+**Why LiteSVM over Bankrun:**
+1. **Performance**: LiteSVM is significantly faster than both solana-test-validator and bankrun
+2. **Ergonomics**: More intuitive API with better TypeScript support
+3. **Maintenance**: Actively maintained with regular updates
+4. **Features**: Built-in support for core programs (System Program, SPL Token, etc.)
+
+**Installation:**
+```bash
+yarn add litesvm
+```
+
+**Basic Usage Pattern:**
+```typescript
+import { LiteSVM } from 'litesvm';
+
+const svm = LiteSVM.load();
+// Airdrop SOL, create transactions, etc.
+```
+
+**Migration from Bankrun:**
+- Replace `start()` with `LiteSVM.load()`
+- Transaction processing is more straightforward
+- Built-in account utilities for easier testing
+- Native time manipulation for timelock testing
 
 ### Key Implementation Insights
 
@@ -591,7 +622,7 @@ tests/
    - Use `msg!()` for program logs
    - Run `solana logs` to stream output
    - Add `#[cfg(feature = "testing")]` for test-only code
-   - Use bankrun tests for faster iteration
+   - Use LiteSVM tests for faster iteration
 
 4. **Deployment**:
    - Test thoroughly on local validator
