@@ -26,7 +26,7 @@ function loadConfig(): CoordinatorConfig {
       rpcWsUrl: Deno.env.get("evm_rpc_ws"),
       privateKey: Deno.env.get("evm_coordinator_private_key") || "",
       tokenAddress: (Deno.env.get("evm_token_contract_address") || "") as any,
-      htlcFactoryAddress: (Deno.env.get("evm_htlc_factory_contract_address") || "") as any,
+      htlcFactoryAddress: (Deno.env.get("evm_htlc_contract_address") || "") as any,
     },
     timelocks: {
       finality: parseInt(Deno.env.get("finality_period") || "30"),
@@ -83,6 +83,7 @@ async function createCoordinator(): Promise<Coordinator> {
     rpcUrl: config.evmConfig.rpcUrl,
     rpcWsUrl: config.evmConfig.rpcWsUrl,
     privateKey: config.evmConfig.privateKey as `0x${string}`,
+    chainId: parseInt(Deno.env.get("evm_chain_id") || "31337"),
   });
 
   // Create HTLC manager
