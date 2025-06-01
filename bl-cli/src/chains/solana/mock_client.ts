@@ -31,7 +31,7 @@ export class MockSolanaClient implements ISolanaClient {
     getAccountInfo: async (pubkey: any) => {
       // Return mock account info
       return {
-        data: Buffer.alloc(165), // Mock HTLC account data
+        data: new Uint8Array(165), // Mock HTLC account data
         executable: false,
         lamports: 1000000,
         owner: "mock-program-id",
@@ -126,7 +126,7 @@ export class MockSolanaClient implements ISolanaClient {
     this.logSubscriptions.set(programId, callbacks);
     
     // Return unsubscribe function
-    return () => {
+    return async () => {
       const updatedCallbacks = this.logSubscriptions.get(programId) || [];
       const index = updatedCallbacks.indexOf(callback);
       if (index > -1) {
