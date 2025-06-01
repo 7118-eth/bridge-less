@@ -343,14 +343,32 @@ deno compile --allow-net --allow-env --allow-read -o bl-cli main.ts
 
 ## Current Implementation Status
 
-### Phase 1: Foundation (Current Focus)
+### Phase 1: Foundation ✅ COMPLETED
 - [x] Project setup with Deno configuration
-- [ ] Basic types and interfaces definition
-- [ ] Cryptographic utilities with tests
-- [ ] Configuration management
-- [ ] Logger and retry utilities
+- [x] Basic types and interfaces definition
+- [x] Cryptographic utilities with tests (100% test coverage)
+- [x] Configuration management with validation
+- [x] Logger and retry utilities
 
-### Phase 2: EVM Integration
+#### Completed Modules:
+1. **Crypto Module** (`src/crypto/`)
+   - `types.ts`: Interfaces for Secret, SecretHash, ISecretManager
+   - `secret.ts`: SecretManager implementation with SHA256 hashing
+   - `secret_test.ts`: Comprehensive tests (all passing)
+   - `index.ts`: Public API exports
+
+2. **Config Module** (`src/config/`)
+   - `types.ts`: Config interfaces (EvmConfig, SvmConfig, TimelockConfig, etc.)
+   - `config.ts`: ConfigManager with env/file loading and validation
+   - `config_test.ts`: Full test coverage (all passing)
+   - `index.ts`: Public API exports
+
+3. **Utils Module** (`src/utils/`)
+   - `logger.ts`: Structured logging with JSON support and child loggers
+   - `retry.ts`: Retry with exponential backoff, jitter, and strategies
+   - `index.ts`: Public API exports
+
+### Phase 2: EVM Integration (NEXT)
 - [ ] Viem client wrapper
 - [ ] HTLC factory interaction
 - [ ] Event monitoring
@@ -363,12 +381,87 @@ deno compile --allow-net --allow-env --allow-read -o bl-cli main.ts
 - [ ] CLI command implementation
 
 ### Phase 4: Integration Testing
-- [ ] End-to-end swap tests
+- [ ] End-to-end swap tests (can start now - EVM contracts deployed locally)
 - [ ] Failure scenario tests
 - [ ] Performance benchmarks
 - [ ] Documentation updates
 
 Note: Solana integration is deferred as the SVM contracts are not yet implemented.
+
+## Important Implementation Details
+
+### Environment Setup
+- Local EVM contracts are already deployed (see .env file)
+- Token contract: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
+- HTLC factory contract: `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`
+- Test accounts with private keys are available
+
+### Key Design Decisions
+1. **Interface-First Development**: All modules have comprehensive TypeScript interfaces
+2. **Test-Driven Development**: Tests written before implementation
+3. **Modular Architecture**: Clear separation of concerns (crypto, config, chains, etc.)
+4. **Error Handling**: Custom error classes for each module (CryptoError, ConfigError, etc.)
+5. **Security**: Private keys validated, secrets never logged, constant-time comparisons
+
+### Testing Approach
+- Using Deno's built-in test runner
+- Tests require permissions: `deno test --allow-env --allow-read --allow-write`
+- Mock external dependencies for unit tests
+- Integration tests can use real local contracts
+
+### Next Implementation Steps
+
+#### Immediate Priority: EVM Client (`src/chains/evm/`)
+1. Create `types.ts` with interfaces for:
+   - `IEvmClient`
+   - `HTLCParams`
+   - `SwapState`
+   - Transaction types
+
+2. Write `client_test.ts` with tests for:
+   - Wallet creation from private key
+   - Balance checking
+   - Transaction sending
+   - Gas estimation
+
+3. Implement `client.ts` using viem:
+   - Connect to RPC
+   - Create wallet client
+   - Public client for reading
+   - Error handling with retry
+
+4. Create `htlc.ts` for HTLC-specific operations:
+   - Create HTLC via factory
+   - Monitor HTLC events
+   - Withdraw/refund operations
+   - Event parsing
+
+#### Coordinator Types (`src/coordinator/types.ts`)
+Define interfaces for:
+- `SwapRequest`
+- `SwapStatus`
+- `CoordinatorState`
+- `ICoordinator`
+
+#### Integration Considerations
+- Use the existing deployed contracts for testing
+- Implement proper event filtering for HTLC monitoring
+- Handle chain reorganizations
+- Implement proper nonce management
+- Add correlation IDs for swap tracking
+
+### CLI Commands to Implement
+1. `init` - Initialize coordinator with config validation
+2. `fund` - Pre-fund liquidity pools (10,000 tokens each)
+3. `swap` - Execute a cross-chain swap
+4. `monitor` - Watch ongoing swaps
+5. `recover` - Handle stuck/failed swaps
+
+### Configuration Notes
+- Environment variables use lowercase with underscores (e.g., `evm_rpc`)
+- All EVM private keys must be 64 hex characters with 0x prefix
+- All addresses must be 40 hex characters with 0x prefix
+- Default timelocks are set for testing (30s finality, 600s cancellation)
 
 ## Key Implementation Notes
 
@@ -382,5 +475,52 @@ Note: Solana integration is deferred as the SVM contracts are not yet implemente
    - Public withdrawal: 300 seconds
    - Cancellation: 600 seconds
 6. **Local EVM Contracts**: Token and HTLC contracts are already deployed on local testnet (see .env)
+
+## Critical Context for Next Session
+
+### Project State
+- **Foundation Complete**: All utility modules (crypto, config, logger, retry) are implemented and tested
+- **Ready for Integration**: Can now build on top of the foundation modules
+- **Contracts Available**: EVM contracts deployed and ready for integration testing
+
+### Technical Decisions Made
+1. **Deno Runtime**: Using Deno for modern TypeScript support and built-in tooling
+2. **Viem for EVM**: Chosen for type safety and excellent TypeScript support
+3. **SHA256 for Hashing**: Cross-chain compatible (both EVM and Solana support it)
+4. **Structured Logging**: JSON format available for production monitoring
+5. **Retry Strategy**: Exponential backoff with jitter for blockchain interactions
+
+### File Structure Created
+```
+bl-cli/
+├── src/
+│   ├── crypto/         ✅ Complete
+│   ├── config/         ✅ Complete
+│   ├── utils/          ✅ Complete
+│   ├── chains/         📝 Next priority
+│   │   ├── evm/       
+│   │   └── solana/    
+│   └── coordinator/    
+├── abi/                ✅ Contract ABIs present
+├── .env                ✅ Configured with deployed contracts
+└── deno.json          ✅ Configured
+```
+
+### Dependencies to Use
+- `jsr:@wevm/viem@2` - For EVM interactions
+- `npm:@solana/web3.js@2` - For Solana (when needed)
+- `jsr:@std/assert@1` - For testing
+- `jsr:@std/testing@1` - For test utilities
+
+### Contract Interfaces (from ABI files)
+- **Token**: Standard ERC20 with mint capability
+- **HTLCFactory**: Creates individual HTLC contracts
+- **HTLC**: Time-locked escrow with secret/hash mechanism
+
+### Next Agent Should Start With
+1. Run `deno test --allow-env --allow-read --allow-write` to verify foundation
+2. Create `src/chains/evm/types.ts` following the interface-first pattern
+3. Implement EVM client wrapper around viem
+4. Test with deployed contracts at addresses in .env
 
 This implementation demonstrates the core HTLC bridge concept while keeping complexity manageable for a proof of concept.
