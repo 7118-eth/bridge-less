@@ -38,7 +38,8 @@ All commands are available as npm scripts in `package.json`. Use `yarn run <comm
 
 ### Integration Setup
 - **deploy:token** - Deploy SPL token with 1M supply and 6 decimals
-- **setup:integration** - Complete setup for bl-cli integration
+- **setup:integration** - Complete setup for bl-cli integration (updates .env)
+- **create:env-local** - Create .env.local file for bl-cli with SVM configuration
 
 ## Architecture
 
@@ -608,6 +609,181 @@ tests/
 4. Deploy to devnet and integrate with live coordinator
 
 **This implementation is PRODUCTION-READY for the PoC phase!**
+
+## Complete Deployment Guide
+
+This section provides a step-by-step guide for deploying the entire system from scratch.
+
+### Prerequisites
+1. Solana CLI installed and configured
+2. Anchor CLI installed (v0.31.1)
+3. Local Solana validator running (`solana-test-validator`)
+4. Node.js and Yarn installed
+
+### Step-by-Step Deployment Process
+
+#### 1. Initial Setup
+```bash
+# Clone the repository and navigate to bl-svm
+cd bl-svm
+
+# Install dependencies
+yarn install
+
+# Build the Anchor program
+yarn run build
+```
+
+#### 2. Generate Keypairs
+```bash
+# Generate coordinator keypair (if not exists)
+solana-keygen new -o ~/.config/solana/coordinator.json --no-bip39-passphrase
+
+# The user keypair should already exist (default Solana keypair)
+# If not, generate it:
+solana-keygen new --no-bip39-passphrase
+```
+
+#### 3. Deploy Contracts
+```bash
+# Deploy SPL Token (1M supply, 6 decimals)
+yarn run deploy:token
+
+# This will:
+# - Create SPL token mint: 91K7aRKwfXUYz7FVw9NVedE23jQurigFHCBaNuhy9HxK (example)
+# - Mint 1,000,000 tokens to coordinator
+# - Transfer 10,000 tokens to user for testing
+# - Save deployment info to deployments/token.json
+
+# Deploy HTLC Program
+yarn run deploy
+
+# This will deploy the program to localnet
+# Program ID: 7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY (from Anchor.toml)
+```
+
+#### 4. Integration Setup
+
+**Option A: Update existing .env file**
+```bash
+# Run the integration setup script
+yarn run setup:integration
+
+# This will:
+# - Copy IDL to ../bl-cli/idl/
+# - Update ../bl-cli/.env with all SVM addresses and keys
+# - Display deployment summary
+```
+
+**Option B: Create .env.local file (recommended for local development)**
+```bash
+# Create a .env.local file with all SVM configurations
+yarn run create:env-local
+
+# This will:
+# - Copy ../bl-cli/.env.example to ../bl-cli/.env.local
+# - Populate all SVM-related variables with correct values
+# - Leave other variables from .env.example unchanged
+```
+
+### Deployment Artifacts
+
+After successful deployment, you'll have:
+
+1. **Token Deployment Info** (`deployments/token.json`):
+   ```json
+   {
+     "tokenMint": "91K7aRKwfXUYz7FVw9NVedE23jQurigFHCBaNuhy9HxK",
+     "coordinatorAddress": "HaKrr9KogfXWLBQGifmuf1CEgDTpYQDJGzFYckEQJuxS",
+     "coordinatorTokenAccount": "HvmhvfCtFFynbNhZZbsbZyfXniPZbJLTBeSMRZx3V288",
+     "userAddress": "DbDa7MHwnNkxZrbQY8qtfhfAGUzBSapLGbafDFwD9Z5X",
+     "userTokenAccount": "HnvzSAyS88P7R3d3QaPBYJjSemkqJswdFsruao42bHDT",
+     "deployedAt": "2025-01-06T09:44:26.542Z",
+     "network": "localnet"
+   }
+   ```
+
+2. **Program IDL** (`target/idl/bl_svm.json`):
+   - Automatically copied to `../bl-cli/idl/`
+   - Used by bl-cli for program interaction
+
+3. **Environment Configuration** (in bl-cli):
+   ```env
+   svm_token_contract_address=91K7aRKwfXUYz7FVw9NVedE23jQurigFHCBaNuhy9HxK
+   svm_htlc_contract_address=7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY
+   svm_user_address=DbDa7MHwnNkxZrbQY8qtfhfAGUzBSapLGbafDFwD9Z5X
+   svm_coordinator_private_key=<base58_encoded_private_key>
+   svm_user_private_key=<base58_encoded_private_key>
+   svm_rpc=http://127.0.0.1:8899
+   svm_rpc_ws=ws://127.0.0.1:8900
+   ```
+
+### Verification Steps
+
+After deployment, verify everything is working:
+
+```bash
+# Check token mint
+spl-token display 91K7aRKwfXUYz7FVw9NVedE23jQurigFHCBaNuhy9HxK
+
+# Check program deployment
+solana program show 7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY
+
+# Check balances
+solana balance # User SOL balance
+solana balance HaKrr9KogfXWLBQGifmuf1CEgDTpYQDJGzFYckEQJuxS # Coordinator SOL
+
+# Check token balances
+spl-token balance 91K7aRKwfXUYz7FVw9NVedE23jQurigFHCBaNuhy9HxK # User tokens
+spl-token balance 91K7aRKwfXUYz7FVw9NVedE23jQurigFHCBaNuhy9HxK --owner HaKrr9KogfXWLBQGifmuf1CEgDTpYQDJGzFYckEQJuxS # Coordinator tokens
+```
+
+### Troubleshooting
+
+1. **"Coordinator keypair not found"**:
+   ```bash
+   solana-keygen new -o ~/.config/solana/coordinator.json --no-bip39-passphrase
+   ```
+
+2. **"Token deployment not found"**:
+   ```bash
+   yarn run deploy:token
+   ```
+
+3. **"Program not deployed"**:
+   ```bash
+   yarn run build
+   yarn run deploy
+   ```
+
+4. **"bs58 not found"**:
+   ```bash
+   yarn add bs58
+   ```
+
+5. **"Insufficient SOL balance"**:
+   ```bash
+   solana airdrop 2 <address>
+   ```
+
+### Using with bl-cli
+
+Once deployment is complete, you can use bl-cli:
+
+```bash
+cd ../bl-cli
+
+# If using .env.local (recommended)
+deno task dev --env-file=.env.local
+
+# Or if you updated .env directly
+deno task dev
+```
+
+The bl-cli will now have access to:
+- The deployed HTLC program
+- The SPL token for swaps
+- Both coordinator and user keypairs for testing
 
 ## Integration with bl-cli
 

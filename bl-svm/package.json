@@ -26,7 +26,8 @@
     "account": "solana account",
     "keygen": "solana-keygen new",
     "deploy:token": "ts-node scripts/deploy-token.ts",
-    "setup:integration": "./scripts/setup-integration.sh"
+    "setup:integration": "./scripts/setup-integration.sh",
+    "create:env-local": "./scripts/create-env-local.sh"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",

@@ -1,0 +1,1177 @@
+{
+  "address": "7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY",
+  "metadata": {
+    "name": "bl_svm",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "cancel",
+      "docs": [
+        "Cancels HTLC and refunds tokens after timeout"
+      ],
+      "discriminator": [
+        232,
+        219,
+        223,
+        41,
+        219,
+        236,
+        220,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "docs": [
+            "Executor cancelling the HTLC (can be anyone after timeout)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "htlc",
+          "docs": [
+            "HTLC PDA account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  116,
+                  108,
+                  99
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "htlc.htlc_id",
+                "account": "HTLC"
+              }
+            ]
+          }
+        },
+        {
+          "name": "src_address",
+          "docs": [
+            "Original resolver/source address to refund to"
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_mint",
+          "docs": [
+            "Token mint"
+          ]
+        },
+        {
+          "name": "htlc_vault",
+          "docs": [
+            "HTLC's token vault PDA"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "htlc"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "src_token_account",
+          "docs": [
+            "Source token account to refund to"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "src_address"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program"
+          ],
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "docs": [
+            "Token program"
+          ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "docs": [
+            "Associated token program"
+          ],
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_htlc",
+      "docs": [
+        "Creates a new HTLC escrow with tokens"
+      ],
+      "discriminator": [
+        217,
+        24,
+        248,
+        19,
+        247,
+        183,
+        68,
+        88
+      ],
+      "accounts": [
+        {
+          "name": "resolver",
+          "docs": [
+            "Resolver/coordinator creating the HTLC"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "htlc",
+          "docs": [
+            "HTLC PDA account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  116,
+                  108,
+                  99
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "params.htlc_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint",
+          "docs": [
+            "Token mint"
+          ]
+        },
+        {
+          "name": "resolver_token_account",
+          "docs": [
+            "Resolver's token account (source of funds)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "resolver"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "htlc_vault",
+          "docs": [
+            "HTLC's token vault PDA"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "htlc"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program"
+          ],
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "docs": [
+            "Token program"
+          ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "docs": [
+            "Associated token program"
+          ],
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "CreateHTLCParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "withdraw_to_destination",
+      "docs": [
+        "Withdraws tokens from HTLC using the correct preimage"
+      ],
+      "discriminator": [
+        207,
+        12,
+        73,
+        94,
+        249,
+        225,
+        1,
+        247
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "docs": [
+            "Executor withdrawing the funds (can be anyone with the preimage)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "htlc",
+          "docs": [
+            "HTLC PDA account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  116,
+                  108,
+                  99
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "htlc.htlc_id",
+                "account": "HTLC"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint",
+          "docs": [
+            "Token mint"
+          ]
+        },
+        {
+          "name": "htlc_vault",
+          "docs": [
+            "HTLC's token vault PDA"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "htlc"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "destination_token_account",
+          "docs": [
+            "Destination token account (on Solana side - the dst_address in HTLC is for EVM)",
+            "For the PoC, this is the executor's account who will bridge to EVM"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "executor"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program"
+          ],
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "docs": [
+            "Token program"
+          ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "docs": [
+            "Associated token program"
+          ],
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": [
+        {
+          "name": "preimage",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "HTLC",
+      "discriminator": [
+        172,
+        245,
+        108,
+        24,
+        224,
+        199,
+        55,
+        177
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "HTLCCancelled",
+      "discriminator": [
+        158,
+        220,
+        88,
+        107,
+        94,
+        201,
+        107,
+        149
+      ]
+    },
+    {
+      "name": "HTLCCreated",
+      "discriminator": [
+        115,
+        208,
+        175,
+        214,
+        231,
+        165,
+        231,
+        151
+      ]
+    },
+    {
+      "name": "HTLCWithdrawn",
+      "discriminator": [
+        234,
+        147,
+        184,
+        74,
+        116,
+        176,
+        252,
+        98
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidTimelockOrder",
+      "msg": "Invalid timelock ordering"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidTokenMint",
+      "msg": "Invalid token mint"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidDestination",
+      "msg": "Invalid destination address"
+    },
+    {
+      "code": 6004,
+      "name": "WithdrawalNotAllowed",
+      "msg": "Withdrawal not allowed at this time"
+    },
+    {
+      "code": 6005,
+      "name": "CancellationNotAllowed",
+      "msg": "Cancellation not allowed yet"
+    },
+    {
+      "code": 6006,
+      "name": "AlreadyWithdrawn",
+      "msg": "HTLC already withdrawn"
+    },
+    {
+      "code": 6007,
+      "name": "AlreadyCancelled",
+      "msg": "HTLC already cancelled"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidPreimage",
+      "msg": "Invalid preimage"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidSafetyDeposit",
+      "msg": "Safety deposit must be greater than zero"
+    }
+  ],
+  "types": [
+    {
+      "name": "CreateHTLCParams",
+      "docs": [
+        "Parameters for creating an HTLC"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "htlc_id",
+            "docs": [
+              "Cross-chain identifier"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "dst_address",
+            "docs": [
+              "EVM recipient address"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          {
+            "name": "dst_token",
+            "docs": [
+              "ERC20 token on EVM"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Token amount (with 6 decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "safety_deposit",
+            "docs": [
+              "Native SOL for incentives"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "hashlock",
+            "docs": [
+              "SHA256 hash"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "finality_deadline",
+            "docs": [
+              "Unix timestamp when finality period ends"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "resolver_deadline",
+            "docs": [
+              "Unix timestamp when resolver exclusive period ends"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "public_deadline",
+            "docs": [
+              "Unix timestamp when public withdrawal period ends"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "cancellation_deadline",
+            "docs": [
+              "Unix timestamp when cancellation is allowed"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HTLC",
+      "docs": [
+        "HTLC account structure (PDA)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "resolver",
+            "docs": [
+              "Who creates the escrow (coordinator)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "src_address",
+            "docs": [
+              "Source of funds (resolver's account)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "dst_address",
+            "docs": [
+              "EVM recipient address (20 bytes)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          {
+            "name": "src_token",
+            "docs": [
+              "SPL token mint on Solana"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "dst_token",
+            "docs": [
+              "ERC20 token on EVM (20 bytes)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Token amount (with 6 decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "safety_deposit",
+            "docs": [
+              "Native SOL for incentives"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "hashlock",
+            "docs": [
+              "SHA256 hash"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "htlc_id",
+            "docs": [
+              "Cross-chain identifier"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "finality_deadline",
+            "docs": [
+              "Unix timestamp when finality period ends"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "resolver_deadline",
+            "docs": [
+              "Unix timestamp when resolver exclusive period ends"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "public_deadline",
+            "docs": [
+              "Unix timestamp when public withdrawal period ends"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "cancellation_deadline",
+            "docs": [
+              "Unix timestamp when cancellation is allowed"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "withdrawn",
+            "docs": [
+              "Whether tokens have been withdrawn"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "cancelled",
+            "docs": [
+              "Whether HTLC has been cancelled"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "created_at",
+            "docs": [
+              "Unix timestamp when HTLC was created"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HTLCCancelled",
+      "docs": [
+        "Event emitted when HTLC is cancelled"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "htlc_account",
+            "docs": [
+              "PDA address of the HTLC account"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "docs": [
+              "Address that executed the cancellation"
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HTLCCreated",
+      "docs": [
+        "Event emitted when a new HTLC is created"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "htlc_account",
+            "docs": [
+              "PDA address of the HTLC account"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "htlc_id",
+            "docs": [
+              "Cross-chain identifier"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "resolver",
+            "docs": [
+              "Resolver/coordinator address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "dst_address",
+            "docs": [
+              "EVM recipient address"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Token amount"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "hashlock",
+            "docs": [
+              "SHA256 hashlock"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "finality_deadline",
+            "docs": [
+              "Unix timestamp when finality period ends"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HTLCWithdrawn",
+      "docs": [
+        "Event emitted when HTLC is withdrawn"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "htlc_account",
+            "docs": [
+              "PDA address of the HTLC account"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "preimage",
+            "docs": [
+              "Preimage that unlocks the HTLC"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "executor",
+            "docs": [
+              "Address that executed the withdrawal"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "destination",
+            "docs": [
+              "EVM recipient address (for logging)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
