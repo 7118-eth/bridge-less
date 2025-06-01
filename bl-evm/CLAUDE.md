@@ -331,3 +331,54 @@ dstToken: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  // USDC on Solana (sto
 ```
 
 This ensures the coordinator knows exactly which token to release on each chain.
+
+### Known Limitations & Production Considerations ⚠️
+
+**1. HTLC ID Generation Issues**:
+- Uses `keccak256` which is not available on Solana (Solana uses SHA256)
+- Includes `block.timestamp` which will differ between chains
+- Cannot generate matching IDs on both chains
+- **Production Fix**: Use SHA256 with chain-agnostic data (hashlock + amount + nonce)
+
+**2. Centralized Coordinator Risks**:
+- Single point of failure - if coordinator goes offline, swaps fail
+- Coordinator holds all liquidity and secrets
+- No slashing or penalties for misbehavior
+- Trust assumptions: users must trust coordinator won't steal funds
+- **Production Fix**: Implement decentralized coordinator network with staking/slashing
+
+**3. Cross-Chain Synchronization**:
+- No direct chain communication - relies entirely on coordinator
+- No on-chain verification that matching HTLC exists on other chain
+- Coordinator could create mismatched HTLCs (different amounts/tokens)
+- **Production Fix**: Add merkle proofs or oracle-based verification
+
+**4. Token Decimal Handling**:
+- No decimal conversion logic between chains
+- EVM tokens: 0-18 decimals, Solana typically: 6-9 decimals
+- Could lead to amount mismatches
+- **Production Fix**: Add decimal normalization in coordinator logic
+
+**5. Limited Token Support**:
+- No whitelist or validation of token pairs
+- No mechanism to add new token mappings
+- Manual token address management
+- **Production Fix**: On-chain token registry with governance
+
+**6. Timelock Limitations**:
+- Fixed timelock periods don't account for chain congestion
+- No adjustment for different block times between chains
+- **Production Fix**: Dynamic timelocks based on chain conditions
+
+**7. No Fee Mechanism**:
+- Coordinator has no incentive to operate
+- No protocol fees for sustainability
+- **Production Fix**: Add coordinator fees and protocol treasury
+
+**8. Missing Safety Features**:
+- No pause mechanism for emergencies
+- No upgrade path for bug fixes
+- No maximum swap limits
+- **Production Fix**: Add pausability, upgradability, and risk limits
+
+These limitations are acceptable for a PoC but MUST be addressed before production deployment.
