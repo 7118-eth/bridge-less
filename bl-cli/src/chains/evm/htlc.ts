@@ -57,7 +57,7 @@ export class HTLCManager implements IHTLCManager {
 
   // Event signatures
   private readonly eventSignatures = {
-    HTLCDeployed: keccak256(toHex("HTLCDeployed(address,address,bytes32,bytes32,address,bytes32,uint256,bytes32,uint256)")),
+    HTLCDeployed: keccak256(toHex("HTLCDeployed(address,bytes32,address,address,bytes32,address,bytes32,uint256,bytes32,uint256)")),
     HTLCWithdrawn: keccak256(toHex("HTLCWithdrawn(bytes32)")),
     HTLCCancelled: keccak256(toHex("HTLCCancelled()")),
   };

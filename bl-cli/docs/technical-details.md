@@ -161,7 +161,7 @@ const coordinator = new Coordinator({
 
 ## Known Issues & Solutions
 1. **Viem Import Path**: Must use `jsr:@wevm/viem@2/accounts` for privateKeyToAccount
-2. **Event Monitoring**: Currently uses mock events, needs WebSocket implementation
+2. **Event Monitoring**: Event detection fixed with correct HTLCDeployed signature, WebSocket implementation pending
 3. **Solana Side**: All Solana operations return mock data
 4. **HTLC Creation**: Mock implementation when ABI array is empty (for testing)
 5. **Gas Estimation**: Always adds 10% buffer

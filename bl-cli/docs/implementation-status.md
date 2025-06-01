@@ -122,6 +122,7 @@ Note: Solana integration is deferred as the SVM contracts are not yet implemente
 2. **Async Bug Resolution**: Added missing `await` keywords for `generateSecret()` and `hashSecret()` operations
 3. **Test Isolation**: Added `testMode` flag to prevent race conditions in test assertions
 4. **100% Test Success**: All 158 test steps across 6 test files now pass without errors
+5. **Event Detection Fixed**: Corrected HTLCDeployed event signature to match actual ABI, event monitoring now working correctly
 
 ## 📁 File Structure Summary
 ```
