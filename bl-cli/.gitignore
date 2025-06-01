@@ -1,3 +1,4 @@
 .env
 .env.bak
 .env.local
+node_modules
