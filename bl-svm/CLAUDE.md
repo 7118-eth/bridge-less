@@ -4,33 +4,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+All commands are available as npm scripts in `package.json`. Use `yarn run <command>` to execute:
+
+**IMPORTANT**: This project uses Yarn as its package manager. Always use `yarn` instead of `npm` or `pnpm`.
+
 ### Build & Test
-- **Build**: `anchor build` - Compiles the Solana program and generates IDL/types
-- **Test**: `anchor test` - Runs all tests with local validator
-- **Test (skip build)**: `anchor test --skip-build` - Runs tests without rebuilding
-- **Test (skip deploy)**: `anchor test --skip-deploy` - Runs tests without deploying
-- **Test (skip local validator)**: `anchor test --skip-local-validator` - Uses existing validator
-- **Test (specific)**: `pnpm test tests/<filename>` - Run specific test file
-- **Test (litesvm)**: `pnpm test tests/litesvm.test.ts` - Run LiteSVM tests (faster and more ergonomic)
+- **build** - Compiles the Solana program and generates IDL/types
+- **test** - Runs all tests with local validator
+- **test:skip-build** - Runs tests without rebuilding
+- **test:skip-deploy** - Runs tests without deploying
+- **test:skip-validator** - Uses existing validator
+- **test:file** `<filename>` - Run specific test file
+- **test:litesvm** - Run LiteSVM tests (faster and more ergonomic)
 
 ### Code Quality
-- **Format**: `cargo fmt` - Formats Rust code according to style guide
-- **Lint**: `cargo clippy` - Runs Rust linter for code quality
-- **Check**: `cargo check` - Fast compilation check without building
+- **format** - Formats Rust code according to style guide
+- **clippy** - Runs Rust linter for code quality
+- **check** - Fast compilation check without building
 
 ### Local Development
-- **Local Validator**: `solana-test-validator` - Starts local Solana validator
-- **Logs**: `solana logs` - Stream program logs from local validator
-- **Deploy**: `anchor deploy` - Deploy program to configured cluster
-- **Deploy (specific)**: `anchor deploy --provider.cluster <cluster>` - Deploy to specific cluster
-- **Upgrade**: `anchor upgrade <program_id> --program-id <path>` - Upgrade deployed program
-- **IDL**: `anchor idl init/upgrade/fetch` - Manage program IDL
+- **validator** - Starts local Solana validator
+- **logs** - Stream program logs from local validator
+- **deploy** - Deploy program to configured cluster
+- **deploy:devnet** - Deploy to devnet cluster
+- **upgrade** `<program_id> --program-id <path>` - Upgrade deployed program
+- **idl:init**, **idl:upgrade**, **idl:fetch** - Manage program IDL
 
 ### Account Management
-- **Airdrop**: `solana airdrop <amount> <address>` - Request SOL from faucet (devnet/testnet)
-- **Balance**: `solana balance <address>` - Check SOL balance
-- **Account Info**: `solana account <address>` - View account details
-- **Generate Keypair**: `solana-keygen new` - Create new keypair
+- **airdrop** `<amount> <address>` - Request SOL from faucet (devnet/testnet)
+- **balance** `<address>` - Check SOL balance
+- **account** `<address>` - View account details
+- **keygen** - Create new keypair
+
+### Integration Setup
+- **deploy:token** - Deploy SPL token with 1M supply and 6 decimals
+- **setup:integration** - Complete setup for bl-cli integration
 
 ## Architecture
 
@@ -125,8 +133,15 @@ Building a minimal FusionPlus-inspired bridge between EVM and Solana. Based on 1
 
 **Token Setup:**
 - Token uses 6 decimals (1 token = 1e6 units) matching EVM side
+- Total supply: 1,000,000 tokens (1_000_000e6 units)
 - Coordinator pre-funds 10,000 tokens (10_000e6 units) on each chain
 - Individual swaps use 1 token (1e6 units) for testing
+
+**SPL Token Deployment Plan:**
+1. Create new SPL Token mint with 6 decimals
+2. Mint total supply of 1,000,000 tokens to coordinator
+3. Token will be used for testing HTLC swaps
+4. Coordinator distributes tokens to user accounts as needed
 
 ### Core Design Principles
 
@@ -593,6 +608,98 @@ tests/
 4. Deploy to devnet and integrate with live coordinator
 
 **This implementation is PRODUCTION-READY for the PoC phase!**
+
+## Integration with bl-cli
+
+### Keypair Setup
+The integration requires two separate keypairs:
+
+1. **Coordinator Keypair** - For the resolver/coordinator role
+   - Location: `~/.config/solana/coordinator.json`
+   - This account will:
+     - Deploy and own the HTLC program
+     - Create HTLCs as resolver
+     - Hold the initial token supply
+
+2. **User Keypair** - For testing user operations
+   - Location: `~/.config/solana/id.json` (default Solana keypair)
+   - This account will:
+     - Receive tokens from coordinator
+     - Act as destination for test swaps
+
+### Environment Variables
+The following variables need to be set in `../bl-cli/.env`:
+
+```env
+# SPL Token mint address (deployed in step 1)
+svm_token_contract_address=<SPL_TOKEN_MINT_ADDRESS>
+
+# HTLC program address (from Anchor.toml or deployment)
+svm_htlc_contract_address=7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY
+
+# User's public key (from default keypair)
+svm_user_address=<USER_PUBKEY>
+
+# Coordinator's private key (base58 encoded)
+svm_coordinator_private_key=<COORDINATOR_PRIVATE_KEY>
+
+# User's private key (base58 encoded)
+svm_user_private_key=<USER_PRIVATE_KEY>
+```
+
+### Setup Process
+
+1. **Generate Keypairs**:
+   ```bash
+   # Coordinator keypair (if not exists)
+   solana-keygen new -o ~/.config/solana/coordinator.json
+   
+   # User keypair (usually already exists)
+   solana-keygen new -o ~/.config/solana/id.json
+   ```
+
+2. **Deploy Token and Program**:
+   ```bash
+   # Build the program first
+   yarn run build
+   
+   # Deploy SPL token (creates mint and mints 1M tokens)
+   yarn run deploy:token
+   
+   # Deploy HTLC program
+   yarn run deploy
+   ```
+
+3. **Run Integration Setup**:
+   ```bash
+   # This script will:
+   # - Copy IDL to bl-cli
+   # - Update .env with addresses
+   # - Display setup summary
+   yarn run setup:integration
+   ```
+
+### Manual Steps (if needed)
+
+1. **Get Addresses**:
+   ```bash
+   # Get user address
+   solana address
+   
+   # Get coordinator address
+   solana address -k ~/.config/solana/coordinator.json
+   ```
+
+2. **Get Private Keys** (base58 encoded):
+   ```bash
+   # Display private key in base58 format
+   cat ~/.config/solana/id.json | jq -r '. | @base64d' | base58
+   ```
+
+3. **Copy IDL**:
+   ```bash
+   cp target/idl/bl_svm.json ../bl-cli/idl/
+   ```
 
 ## Development Workflow
 
