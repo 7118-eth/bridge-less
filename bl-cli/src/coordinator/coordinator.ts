@@ -17,6 +17,7 @@ import type {
 import { ChainType, CoordinatorError, ErrorCodes } from "./types.ts";
 import type { IEvmClient, IHTLCManager, Hash, Address } from "../chains/evm/types.ts";
 import { HTLCEventType } from "../chains/evm/types.ts";
+import type { ISolanaClient, ISolanaHTLCManager } from "../chains/solana/types.ts";
 import type { ISecretManager } from "../crypto/types.ts";
 import { SecretManager } from "../crypto/secret.ts";
 import { createLogger, type Logger } from "../utils/logger.ts";
@@ -32,10 +33,16 @@ export interface CoordinatorOptions {
   evmClient: IEvmClient;
   /** HTLC manager instance */
   htlcManager: IHTLCManager;
+  /** Solana client instance (optional) */
+  solanaClient?: ISolanaClient;
+  /** Solana HTLC manager instance (optional) */
+  solanaHTLCManager?: ISolanaHTLCManager;
   /** Secret manager instance (optional) */
   secretManager?: ISecretManager;
   /** Liquidity manager instance (optional) */
   liquidityManager?: ILiquidityManager;
+  /** Logger instance (optional) */
+  logger?: Logger;
 }
 
 /**
@@ -55,6 +62,8 @@ export class Coordinator implements ICoordinator {
   private readonly config: CoordinatorConfig;
   private readonly evmClient: IEvmClient;
   private readonly htlcManager: IHTLCManager;
+  private readonly solanaClient?: ISolanaClient;
+  private readonly solanaHTLCManager?: ISolanaHTLCManager;
   private readonly secretManager: ISecretManager;
   private readonly liquidityManager: ILiquidityManager;
   private readonly logger: Logger;
@@ -69,13 +78,15 @@ export class Coordinator implements ICoordinator {
     this.config = options.config;
     this.evmClient = options.evmClient;
     this.htlcManager = options.htlcManager;
+    this.solanaClient = options.solanaClient;
+    this.solanaHTLCManager = options.solanaHTLCManager;
     this.secretManager = options.secretManager || new SecretManager();
     this.liquidityManager = options.liquidityManager || new LiquidityManager({
       evmClient: this.evmClient,
       evmTokenAddress: this.config.evmConfig.tokenAddress,
     });
 
-    this.logger = createLogger({
+    this.logger = options.logger || createLogger({
       level: "info",
       json: false,
     }).child({ module: "coordinator" });
@@ -513,19 +524,61 @@ export class Coordinator implements ICoordinator {
     this.updateSwapState(swapId, "destination_locked" as SwapState);
 
     try {
-      // For Solana destination - mock for now
+      // For Solana destination
       if (swap.request.to === ChainType.Solana) {
+        if (!this.solanaHTLCManager || !this.solanaClient) {
+          // Fallback to mock for testing
+          swap.destinationHTLC = {
+            contractAddress: "0xdest000000000000000000000000000000000000" as Address,
+            transactionHash: "0xdest000000000000000000000000000000000000000000000000000000000000" as Hash,
+            blockNumber: 0n,
+            timestamp: Date.now(),
+            withdrawn: false,
+            refunded: false,
+          };
+          this.swaps.set(swapId, swap);
+          this.logger.info("Destination HTLC created (mock)", { swapId });
+          return;
+        }
+
+        // Create real Solana HTLC
+        const htlcId = Buffer.from(swap.id, 'hex');
+        const destinationAddress = Buffer.from(swap.request.receiver.replace('0x', ''), 'hex').slice(0, 20);
+        const destinationToken = Buffer.from(swap.request.sourceTokenAddress.replace('0x', ''), 'hex').slice(0, 20);
+        
+        const hashlock = swap.hashLock ? Buffer.from(swap.hashLock.replace('0x', ''), 'hex') : new Uint8Array(32);
+        
+        const now = Math.floor(Date.now() / 1000);
+        const result = await this.solanaHTLCManager.createHTLC({
+          htlcId: new Uint8Array(htlcId),
+          destinationAddress: new Uint8Array(destinationAddress),
+          destinationToken: new Uint8Array(destinationToken),
+          amount: swap.request.amount,
+          safetyDeposit: 10000n, // 0.00001 SOL
+          hashlock: new Uint8Array(hashlock),
+          timelocks: {
+            finality: now + this.config.timelocks.finality,
+            resolver: now + this.config.timelocks.resolver,
+            public: now + this.config.timelocks.public,
+            cancellation: now + this.config.timelocks.cancellation,
+          },
+        });
+
         swap.destinationHTLC = {
-          contractAddress: "0xdest000000000000000000000000000000000000" as Address,
-          transactionHash: "0xdest000000000000000000000000000000000000000000000000000000000000" as Hash,
-          blockNumber: 0n,
+          contractAddress: result.htlcAddress as Address,
+          transactionHash: result.transactionHash as Hash,
+          blockNumber: BigInt(result.slot),
           timestamp: Date.now(),
           withdrawn: false,
           refunded: false,
         };
 
         this.swaps.set(swapId, swap);
-        this.logger.info("Destination HTLC created", { swapId });
+        this.logger.info("Destination HTLC created on Solana", { 
+          swapId,
+          htlcAddress: result.htlcAddress,
+          txHash: result.transactionHash,
+        });
       }
     } catch (error) {
       this.updateSwapState(swapId, "refunding" as SwapState, `Failed to create destination HTLC: ${error}`);
