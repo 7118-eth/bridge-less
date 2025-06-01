@@ -58,8 +58,9 @@ export interface ISolanaHTLCManager {
 ```typescript
 // src/chains/solana/client.ts
 
-import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
-import { getBase58Encoder } from '@solana/codecs';
+// Deno imports using npm: prefix
+import { createSolanaRpc, createSolanaRpcSubscriptions } from "npm:@solana/kit";
+import { getBase58Encoder } from "npm:@solana/codecs";
 
 export class SolanaClient implements ISolanaClient {
   private rpc;
@@ -131,13 +132,20 @@ async watchHTLCEvents(callback: (event: HTLCEvent) => void): Promise<() => void>
 
 ## Implementation Steps
 
-### Step 1: Install Dependencies
+### Step 1: Install Dependencies (Deno)
 ```bash
-# Install Anza Kit
-npm install --save @solana/kit
+# For Deno, we use npm: imports directly
+# No installation needed, just import:
 
-# Install Anchor for IDL parsing (optional)
-npm install --save @coral-xyz/anchor
+# Example imports:
+import { createSolanaRpc, createSolanaRpcSubscriptions } from "npm:@solana/kit";
+import { getBase58Encoder } from "npm:@solana/codecs";
+
+# Note: Some packages might need version pinning:
+import { createSolanaRpc } from "npm:@solana/kit@latest";
+
+# For existing @solana/web3.js (if needed for compatibility):
+import { Connection, PublicKey, Keypair } from "npm:@solana/web3.js@2";
 ```
 
 ### Step 2: Create Type Definitions
@@ -213,9 +221,26 @@ Already configured in .env:
 ## Next Immediate Actions
 
 1. Create `src/chains/solana/types.ts` with interfaces
-2. Install Anza Kit dependencies
-3. Implement basic SolanaClient with connection management
+2. No installation needed - Deno will fetch dependencies on first import
+3. Implement basic SolanaClient with connection management using `npm:@solana/kit`
 4. Add simple balance query test
 5. Gradually build out HTLC functionality
 
-This plan provides a clear path from the current mock implementation to a fully functional Solana integration using modern tooling.
+## Deno-Specific Considerations
+
+1. **Import Maps**: Consider using deno.json import map for cleaner imports:
+   ```json
+   {
+     "imports": {
+       "@solana/kit": "npm:@solana/kit@latest",
+       "@solana/codecs": "npm:@solana/codecs@latest",
+       "@solana/web3.js": "npm:@solana/web3.js@2"
+     }
+   }
+   ```
+
+2. **Type Support**: Deno should automatically fetch types from npm packages
+3. **Caching**: First run will download dependencies, subsequent runs use cache
+4. **Permissions**: May need `--allow-net` for npm registry access
+
+This plan provides a clear path from the current mock implementation to a fully functional Solana integration using modern tooling with Deno.
