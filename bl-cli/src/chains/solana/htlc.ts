@@ -75,10 +75,12 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
       this.coder = new BorshCoder(idl as any);
     } catch (error) {
       this.logger.warn("Failed to initialize BorshCoder, some features may be limited", { error: error.message });
-      // Create a mock coder for basic functionality
+      // Create a mock coder that throws to force manual encoding
       this.coder = {
         instruction: {
-          encode: (name: string, data: any) => new Uint8Array(100).fill(0)
+          encode: (name: string, data: any) => {
+            throw new Error("Mock coder - use manual encoding");
+          }
         },
         accounts: {
           decode: (name: string, data: Buffer) => ({})
@@ -120,20 +122,93 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
       );
       
       // Build instruction data
-      const instructionData = this.coder.instruction.encode("create_htlc", {
-        params: {
-          htlcId: Array.from(params.htlcId),
-          dstAddress: Array.from(params.destinationAddress),
-          dstToken: Array.from(params.destinationToken),
-          amount: params.amount.toString(),
-          safetyDeposit: params.safetyDeposit.toString(),
-          hashlock: Array.from(params.hashlock),
-          finalityDeadline: params.timelocks.finality,
-          resolverDeadline: params.timelocks.resolver,
-          publicDeadline: params.timelocks.public,
-          cancellationDeadline: params.timelocks.cancellation,
-        },
-      });
+      let instructionData: Uint8Array;
+      try {
+        instructionData = this.coder.instruction.encode("create_htlc", {
+          params: {
+            htlc_id: Array.from(params.htlcId),
+            dst_address: Array.from(params.destinationAddress),
+            dst_token: Array.from(params.destinationToken),
+            amount: params.amount.toString(),
+            safety_deposit: params.safetyDeposit.toString(),
+            hashlock: Array.from(params.hashlock),
+            finality_deadline: params.timelocks.finality,
+            resolver_deadline: params.timelocks.resolver,
+            public_deadline: params.timelocks.public,
+            cancellation_deadline: params.timelocks.cancellation,
+          },
+        });
+      } catch (error) {
+        // Fallback: manually construct the instruction data
+        this.logger.warn("Using fallback instruction encoding");
+        
+        // Discriminator for create_htlc: [217, 24, 248, 19, 247, 183, 68, 88]
+        const discriminator = new Uint8Array([217, 24, 248, 19, 247, 183, 68, 88]);
+        
+        // Manually encode the parameters (simplified version)
+        const data = new Uint8Array(8 + 32 + 20 + 20 + 8 + 8 + 32 + 8 + 8 + 8 + 8);
+        let offset = 0;
+        
+        // Discriminator
+        data.set(discriminator, offset);
+        offset += 8;
+        
+        // htlc_id
+        data.set(params.htlcId, offset);
+        offset += 32;
+        
+        // dst_address
+        data.set(params.destinationAddress, offset);
+        offset += 20;
+        
+        // dst_token
+        data.set(params.destinationToken, offset);
+        offset += 20;
+        
+        // amount (u64 - little endian)
+        const amountBytes = new Uint8Array(8);
+        const amountView = new DataView(amountBytes.buffer);
+        amountView.setBigUint64(0, params.amount, true);
+        data.set(amountBytes, offset);
+        offset += 8;
+        
+        // safety_deposit (u64 - little endian)
+        const safetyBytes = new Uint8Array(8);
+        const safetyView = new DataView(safetyBytes.buffer);
+        safetyView.setBigUint64(0, params.safetyDeposit, true);
+        data.set(safetyBytes, offset);
+        offset += 8;
+        
+        // hashlock
+        data.set(params.hashlock, offset);
+        offset += 32;
+        
+        // timestamps (i64 - little endian)
+        const finalityBytes = new Uint8Array(8);
+        const finalityView = new DataView(finalityBytes.buffer);
+        finalityView.setBigInt64(0, BigInt(params.timelocks.finality), true);
+        data.set(finalityBytes, offset);
+        offset += 8;
+        
+        const resolverBytes = new Uint8Array(8);
+        const resolverView = new DataView(resolverBytes.buffer);
+        resolverView.setBigInt64(0, BigInt(params.timelocks.resolver), true);
+        data.set(resolverBytes, offset);
+        offset += 8;
+        
+        const publicBytes = new Uint8Array(8);
+        const publicView = new DataView(publicBytes.buffer);
+        publicView.setBigInt64(0, BigInt(params.timelocks.public), true);
+        data.set(publicBytes, offset);
+        offset += 8;
+        
+        const cancelBytes = new Uint8Array(8);
+        const cancelView = new DataView(cancelBytes.buffer);
+        cancelView.setBigInt64(0, BigInt(params.timelocks.cancellation), true);
+        data.set(cancelBytes, offset);
+        
+        instructionData = data;
+      }
       
       // Create instruction
       const instruction = new TransactionInstruction({
@@ -148,7 +223,7 @@ export class SolanaHTLCManager implements ISolanaHTLCManager {
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
           { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         ],
-        data: new Uint8Array(instructionData),
+        data: instructionData,
       });
       
       // Create and send transaction

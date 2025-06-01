@@ -8,7 +8,7 @@
 "nodeModulesDir": "auto"
 
 # 2. Install dependencies
-npm install
+deno install --allow-scripts
 
 # 3. Run any command - Solana now works!
 deno task init
@@ -58,7 +58,7 @@ deno task swap --amount 1000000
 // Solution in deno.json:
 "nodeModulesDir": "auto"
 ```
-Then run `npm install` once.
+Then run `deno install --allow-scripts` once.
 
 ### ✅ bs58 Import - FIXED
 ```typescript
@@ -192,7 +192,7 @@ The error is expected - it means everything works but needs deployed program!
 - Verify token accounts exist
 
 ### Import Errors
-- Run `npm install` first
+- Run `deno install --allow-scripts` first
 - Ensure `"nodeModulesDir": "auto"` in deno.json
 - Try clearing cache: `deno cache --reload`
 

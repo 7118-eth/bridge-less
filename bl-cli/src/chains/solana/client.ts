@@ -123,7 +123,8 @@ export class SolanaClient implements ISolanaClient {
       // Send with retry logic
       const signature = await retry(
         async () => {
-          return await this.connection.sendTransaction(tx, {
+          // Transaction should already be signed, so we use sendRawTransaction
+          return await this.connection.sendRawTransaction(tx.serialize(), {
             skipPreflight: false,
             preflightCommitment: this.config.commitment,
           });
