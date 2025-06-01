@@ -9,7 +9,7 @@ import { load } from "jsr:@std/dotenv@0";
 import { Coordinator, type CoordinatorConfig, ChainType, type SwapRequest } from "./src/coordinator/index.ts";
 import { EvmClient, HTLCManager } from "./src/chains/evm/index.ts";
 import { SolanaClient, SolanaHTLCManager } from "./src/chains/solana/index.ts";
-import { Keypair } from "npm:@solana/web3.js@2";
+import { Keypair } from "npm:@solana/web3.js@1.95";
 import { createLogger } from "./src/utils/logger.ts";
 import { readFileSync } from "node:fs";
 
