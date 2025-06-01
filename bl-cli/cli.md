@@ -35,6 +35,13 @@ The coordinator CLI is the central orchestrator for the bridge-less atomic swap 
 
 ## Implementation Stack
 
+### Dependencies notes:
+https://github.com/tj/commander.js
+https://www.npmjs.com/package/commander
+instead of solana web3 v1, use https://github.com/anza-xyz/kit (its rename 2.x...)
+https://www.npmjs.com/package/bs58? not sure if any why we need that! double check.
+
+
 ### Dependencies
 ```json
 {
@@ -83,13 +90,13 @@ interface CoordinatorConfig {
   evmPrivateKey: string;
   evmFactoryAddress: string;
   evmTokenAddress: string;
-  
+
   // Solana Configuration
   solanaRpcUrl: string;
   solanaKeypair: Uint8Array;
   solanaProgramId: string;
   solanaTokenMint: string;
-  
+
   // Bridge Configuration
   swapAmount: bigint;  // 1e6 for 1 token
   finalityPeriod: number;  // 30 seconds
@@ -101,13 +108,13 @@ interface CoordinatorConfig {
 class Coordinator {
   // Initialize clients for both chains
   async initialize(): Promise<void>;
-  
+
   // Pre-fund liquidity on both chains
   async fundLiquidity(): Promise<void>;
-  
+
   // Execute a complete swap
   async executeSwap(params: SwapParams): Promise<SwapResult>;
-  
+
   // Monitor and handle events
   async startEventMonitoring(): Promise<void>;
 }
@@ -119,13 +126,13 @@ class Coordinator {
 class EVMClient {
   // Deploy HTLC through factory
   async createHTLC(params: HTLCParams): Promise<HTLCDeployment>;
-  
+
   // Withdraw with preimage
   async withdrawHTLC(htlcAddress: string, preimage: string): Promise<TransactionReceipt>;
-  
+
   // Cancel HTLC after timeout
   async cancelHTLC(htlcAddress: string): Promise<TransactionReceipt>;
-  
+
   // Monitor factory events
   async watchHTLCDeployments(callback: (event: HTLCDeployedEvent) => void): void;
 }
@@ -137,13 +144,13 @@ class EVMClient {
 class SolanaClient {
   // Initialize HTLC PDA
   async createHTLC(params: HTLCParams): Promise<HTLCAccount>;
-  
+
   // Claim with secret
   async claimHTLC(htlcPDA: PublicKey, secret: Buffer): Promise<TransactionSignature>;
-  
+
   // Refund after timeout
   async refundHTLC(htlcPDA: PublicKey): Promise<TransactionSignature>;
-  
+
   // Monitor program events
   async watchHTLCEvents(callback: (event: HTLCEvent) => void): void;
 }
@@ -178,14 +185,14 @@ async function initializeSwap() {
   // 1. Generate secret and compute hash
   const secret = generateSecret();
   const hashlock = await sha256(secret);
-  
+
   // 2. Calculate timelocks
   const now = Math.floor(Date.now() / 1000);
   const finalityDeadline = now + config.finalityPeriod;
   const resolverDeadline = finalityDeadline + config.resolverPeriod;
   const publicDeadline = resolverDeadline + config.publicPeriod;
   const cancelDeadline = publicDeadline + config.cancelPeriod;
-  
+
   // 3. Store swap state
   const swapId = generateSwapId();
   await storeSwapState(swapId, { secret, hashlock, timelocks });
@@ -204,10 +211,10 @@ async function createHTLCs(swapState: SwapState) {
     hashlock: swapState.hashlock,
     timelocks: swapState.timelocks
   });
-  
+
   // 2. Wait for EVM finality
   await waitForFinality(evmHTLC.blockNumber);
-  
+
   // 3. Create Solana HTLC (destination chain)
   const solanaHTLC = await solanaClient.createHTLC({
     sender: coordinatorSolanaKeypair,
@@ -217,7 +224,7 @@ async function createHTLCs(swapState: SwapState) {
     hashlock: swapState.hashlock,
     timelocks: swapState.timelocks
   });
-  
+
   // 4. Update swap state with HTLC addresses
   await updateSwapState(swapState.id, {
     evmHTLC: evmHTLC.address,
@@ -232,22 +239,22 @@ async function completeSwap(swapState: SwapState) {
   // 1. Wait for both finality periods
   await waitForFinality(swapState.evmHTLC.blockNumber);
   await waitForSolanaFinality(swapState.solanaHTLC.slot);
-  
+
   // 2. Reveal secret by withdrawing on source chain
   const evmWithdrawTx = await evmClient.withdrawHTLC(
     swapState.evmHTLC.address,
     bytesToHex(swapState.secret)
   );
-  
+
   // 3. Extract revealed secret from event (verification)
   const revealedSecret = await extractSecretFromTx(evmWithdrawTx);
-  
+
   // 4. Withdraw on destination chain
   const solanaTx = await solanaClient.claimHTLC(
     swapState.solanaHTLC.publicKey,
     Buffer.from(swapState.secret)
   );
-  
+
   // 5. Update final swap state
   await finalizeSwapState(swapState.id, {
     status: 'completed',
@@ -261,7 +268,7 @@ async function completeSwap(swapState: SwapState) {
 ```typescript
 async function handleTimeout(swapState: SwapState) {
   const now = Math.floor(Date.now() / 1000);
-  
+
   // Check if we're in cancellation period
   if (now > swapState.timelocks.cancelDeadline) {
     // Cancel both HTLCs
@@ -269,7 +276,7 @@ async function handleTimeout(swapState: SwapState) {
       evmClient.cancelHTLC(swapState.evmHTLC.address),
       solanaClient.refundHTLC(swapState.solanaHTLC.publicKey)
     ]);
-    
+
     await updateSwapState(swapState.id, { status: 'cancelled' });
   }
 }
@@ -284,7 +291,7 @@ evmClient.watchHTLCDeployments(async (event) => {
   console.log(`HTLC deployed: ${event.htlcContract}`);
   console.log(`HTLC ID: ${event.htlcId}`);
   console.log(`Amount: ${event.amount}`);
-  
+
   // Track in coordinator state
   await trackHTLCDeployment(event);
 });
