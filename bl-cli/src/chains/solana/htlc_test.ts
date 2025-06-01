@@ -3,7 +3,7 @@
  */
 
 import { assertEquals, assertExists } from "jsr:@std/assert@1";
-import { Keypair } from "npm:@solana/web3.js@2";
+import { Keypair } from "npm:@solana/web3.js@1.95";
 import { MockSolanaClient } from "./mock_client.ts";
 import { SolanaHTLCManager } from "./htlc.ts";
 import { HTLCEventType } from "./types.ts";
@@ -44,7 +44,7 @@ const mockCoder = {
   events: {
     decode: (data: Buffer) => {
       // Check discriminator
-      const discriminator = data.slice(0, 8);
+      const discriminator = Array.from(data.slice(0, 8));
       const created = [115, 208, 175, 214, 231, 165, 231, 151];
       
       if (discriminator.every((v, i) => v === created[i])) {
@@ -86,7 +86,7 @@ Deno.test("SolanaHTLCManager - create HTLC", async () => {
   const htlcManager = new TestableHTLCManager({
     client,
     programId: "7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY",
-    tokenMint: "mock-token-mint",
+    tokenMint: "11111111111111111111111111111111", // Valid base58 mock address
     keypair,
     logger,
   });
@@ -131,7 +131,7 @@ Deno.test("SolanaHTLCManager - withdraw to destination", async () => {
   const htlcManager = new TestableHTLCManager({
     client,
     programId: "7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY",
-    tokenMint: "mock-token-mint",
+    tokenMint: "11111111111111111111111111111111", // Valid base58 mock address
     keypair,
     logger,
   });
@@ -156,7 +156,7 @@ Deno.test("SolanaHTLCManager - cancel HTLC", async () => {
   const htlcManager = new TestableHTLCManager({
     client,
     programId: "7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY",
-    tokenMint: "mock-token-mint",
+    tokenMint: "11111111111111111111111111111111", // Valid base58 mock address
     keypair,
     logger,
   });
@@ -180,7 +180,7 @@ Deno.test("SolanaHTLCManager - get HTLC state", async () => {
   const htlcManager = new TestableHTLCManager({
     client,
     programId: "7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY",
-    tokenMint: "mock-token-mint",
+    tokenMint: "11111111111111111111111111111111", // Valid base58 mock address
     keypair,
     logger,
   });
@@ -208,7 +208,7 @@ Deno.test("SolanaHTLCManager - watch HTLC events", async () => {
   const htlcManager = new TestableHTLCManager({
     client,
     programId: "7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY",
-    tokenMint: "mock-token-mint",
+    tokenMint: "11111111111111111111111111111111", // Valid base58 mock address
     keypair,
     logger,
   });
@@ -245,7 +245,7 @@ Deno.test("SolanaHTLCManager - get HTLC address", async () => {
   const htlcManager = new TestableHTLCManager({
     client,
     programId: "7225bNQ76UjXRSsKdvUPshmuDDNFyACoPawGGJaZvSuY",
-    tokenMint: "mock-token-mint",
+    tokenMint: "11111111111111111111111111111111", // Valid base58 mock address
     keypair,
     logger,
   });
