@@ -3,13 +3,11 @@ import type {
   IHTLCManager, 
   HTLCParams, 
   HTLCInfo, 
-  HTLCState, 
   HTLCEvent,
-  HTLCEventType,
   Address,
   Hash,
 } from "./types.ts";
-import { EvmError } from "./types.ts";
+import { EvmError, HTLCState, HTLCEventType } from "./types.ts";
 
 /**
  * Tests for HTLC manager
