@@ -542,11 +542,30 @@ export class Coordinator implements ICoordinator {
         }
 
         // Create real Solana HTLC
-        const htlcId = Buffer.from(swap.id, 'hex');
-        const destinationAddress = Buffer.from(swap.request.receiver.replace('0x', ''), 'hex').slice(0, 20);
-        const destinationToken = Buffer.from(swap.request.sourceTokenAddress.replace('0x', ''), 'hex').slice(0, 20);
+        const htlcId = new Uint8Array(32);
+        const encoder = new TextEncoder();
+        const idBytes = encoder.encode(swap.id);
+        htlcId.set(idBytes.slice(0, 32));
         
-        const hashlock = swap.hashLock ? Buffer.from(swap.hashLock.replace('0x', ''), 'hex') : new Uint8Array(32);
+        const destinationAddress = new Uint8Array(20);
+        // For Solana address, we'll use first 20 bytes of the address
+        const destBytes = encoder.encode(swap.request.receiver);
+        destinationAddress.set(destBytes.slice(0, 20));
+        
+        const destinationToken = new Uint8Array(20);
+        // Use the configured EVM token address
+        const tokenHex = this.config.evmConfig.tokenAddress.replace('0x', '');
+        for (let i = 0; i < Math.min(20, tokenHex.length / 2); i++) {
+          destinationToken[i] = parseInt(tokenHex.substr(i * 2, 2), 16);
+        }
+        
+        const hashlock = new Uint8Array(32);
+        if (swap.hashLock) {
+          const hashHex = swap.hashLock.replace('0x', '');
+          for (let i = 0; i < Math.min(32, hashHex.length / 2); i++) {
+            hashlock[i] = parseInt(hashHex.substr(i * 2, 2), 16);
+          }
+        }
         
         const now = Math.floor(Date.now() / 1000);
         const result = await this.solanaHTLCManager.createHTLC({
