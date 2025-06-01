@@ -21,6 +21,9 @@ contract HTLCFactoryTest is Test {
     bytes32 public dstAddress = bytes32(uint256(0x3));
     address public randomUser = address(0x4);
     
+    // Solana token mint (example: USDC on Solana)
+    bytes32 public constant SOLANA_USDC = bytes32(keccak256("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"));
+    
     // Test values
     uint256 public constant AMOUNT = 1e6; // 1 token with 6 decimals
     bytes32 public secret = keccak256("test_secret");
@@ -33,7 +36,8 @@ contract HTLCFactoryTest is Test {
         address indexed resolver,
         address srcAddress,
         bytes32 dstAddress,
-        address token,
+        address srcToken,
+        bytes32 dstToken,
         uint256 amount,
         bytes32 hashlock,
         uint256 finalityDeadline
@@ -76,6 +80,7 @@ contract HTLCFactoryTest is Test {
             srcAddress,
             dstAddress,
             address(token),
+            SOLANA_USDC,
             AMOUNT,
             hashlock,
             block.timestamp
@@ -90,6 +95,7 @@ contract HTLCFactoryTest is Test {
             srcAddress,
             dstAddress,
             address(token),
+            SOLANA_USDC,
             AMOUNT,
             hashlock,
             block.timestamp + 30
@@ -101,6 +107,7 @@ contract HTLCFactoryTest is Test {
             srcAddress,
             dstAddress,
             address(token),
+            SOLANA_USDC,
             AMOUNT,
             hashlock
         );
@@ -137,6 +144,7 @@ contract HTLCFactoryTest is Test {
             srcAddress,
             dstAddress,
             address(token),
+            SOLANA_USDC,
             0,
             hashlock
         );
@@ -154,6 +162,7 @@ contract HTLCFactoryTest is Test {
             srcAddress,
             dstAddress,
             address(0),
+            SOLANA_USDC,
             AMOUNT,
             hashlock
         );
@@ -171,6 +180,7 @@ contract HTLCFactoryTest is Test {
             address(0),
             dstAddress,
             address(token),
+            SOLANA_USDC,
             AMOUNT,
             hashlock
         );
@@ -188,6 +198,25 @@ contract HTLCFactoryTest is Test {
             srcAddress,
             bytes32(0),
             address(token),
+            SOLANA_USDC,
+            AMOUNT,
+            hashlock
+        );
+    }
+    
+    /// @notice Test creating HTLC with invalid destination token
+    function testCreateHTLCWithInvalidDstToken() public {
+        // Deploy factory
+        factory = new HTLCFactory();
+        
+        // Try to create HTLC with empty destination token
+        vm.prank(resolver);
+        vm.expectRevert(IHTLCFactory.InvalidDstAddress.selector); // Reuses same error
+        factory.createHTLC(
+            srcAddress,
+            dstAddress,
+            address(token),
+            bytes32(0), // Invalid dst token
             AMOUNT,
             hashlock
         );
@@ -205,6 +234,7 @@ contract HTLCFactoryTest is Test {
             srcAddress,
             dstAddress,
             address(token),
+            SOLANA_USDC,
             AMOUNT,
             bytes32(0)
         );
@@ -231,6 +261,7 @@ contract HTLCFactoryTest is Test {
                 srcAddress,
                 dstAddress,
                 address(token),
+                SOLANA_USDC,
                 AMOUNT,
                 uniqueHashlock
             );

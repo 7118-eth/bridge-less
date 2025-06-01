@@ -116,7 +116,8 @@ Using a factory pattern for better isolation and security in our proof of concep
    function createHTLC(
        address srcAddress,     // Maker's address (source of funds)
        bytes32 dstAddress,     // Maker's Solana address (destination)
-       address token,          // ERC20 token
+       address srcToken,       // ERC20 token on source chain (EVM)
+       bytes32 dstToken,       // SPL token mint on destination chain (Solana)
        uint256 amount,         // Token amount
        bytes32 hashlock       // SHA256 hash
    ) external returns (address htlcContract, bytes32 htlcId);
@@ -129,7 +130,8 @@ Using a factory pattern for better isolation and security in our proof of concep
    address public immutable resolver;     // Who creates the escrow (coordinator)
    address public immutable srcAddress;   // Source of funds (maker on source chain)
    bytes32 public immutable dstAddress;   // Recipient (maker's Solana address)
-   address public immutable token;
+   address public immutable srcToken;     // ERC20 token on source chain (EVM)
+   bytes32 public immutable dstToken;     // SPL token mint on destination chain (Solana)
    uint256 public immutable amount;
    bytes32 public immutable hashlock;
    
@@ -307,3 +309,14 @@ With Solidity optimizer enabled (800 runs):
    - Can handle multiple concurrent HTLCs
    - Public withdrawal assistance works as designed
    - Cancellation mechanism protects against failed swaps
+
+### Critical Update Required: Cross-Chain Token Specification
+**Issue**: Current implementation only stores the source (EVM) token address but not the destination (Solana) token mint address. This is required for the coordinator to know which SPL token to release on Solana.
+
+**Solution**: Add `dstToken` parameter to store the Solana SPL token mint address:
+- Update HTLC to store both `srcToken` (EVM) and `dstToken` (Solana)
+- Update HTLCFactory to accept both token addresses
+- Update all tests to provide Solana token mint addresses
+- Update HTLC ID generation to include both tokens
+
+This ensures the bridge can properly map between different token representations on each chain (e.g., USDC on Ethereum → USDC on Solana).

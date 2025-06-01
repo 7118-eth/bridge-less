@@ -12,7 +12,8 @@ interface IHTLCFactory {
     /// @param resolver Address of the resolver (coordinator)
     /// @param srcAddress Source address providing the tokens
     /// @param dstAddress Destination address (Solana address as bytes32)
-    /// @param token ERC20 token address
+    /// @param srcToken ERC20 token address on source chain
+    /// @param dstToken SPL token mint address on destination chain
     /// @param amount Amount of tokens locked
     /// @param hashlock SHA256 hash lock
     /// @param finalityDeadline When operations can begin
@@ -22,7 +23,8 @@ interface IHTLCFactory {
         address indexed resolver,
         address srcAddress,
         bytes32 dstAddress,
-        address token,
+        address srcToken,
+        bytes32 dstToken,
         uint256 amount,
         bytes32 hashlock,
         uint256 finalityDeadline
@@ -47,7 +49,8 @@ interface IHTLCFactory {
     /// @dev Deploys a new HTLC and transfers tokens from resolver
     /// @param srcAddress Maker's address (source of funds on source chain)
     /// @param dstAddress Maker's Solana address (destination)
-    /// @param token ERC20 token to lock
+    /// @param srcToken ERC20 token to lock on source chain
+    /// @param dstToken SPL token mint to release on destination chain
     /// @param amount Amount of tokens to lock
     /// @param hashlock SHA256 hash for atomic swap
     /// @return htlcContract Address of deployed HTLC contract
@@ -55,7 +58,8 @@ interface IHTLCFactory {
     function createHTLC(
         address srcAddress,
         bytes32 dstAddress,
-        address token,
+        address srcToken,
+        bytes32 dstToken,
         uint256 amount,
         bytes32 hashlock
     ) external returns (address htlcContract, bytes32 htlcId);

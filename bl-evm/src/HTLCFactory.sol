@@ -19,15 +19,17 @@ contract HTLCFactory is IHTLCFactory {
     function createHTLC(
         address srcAddress,
         bytes32 dstAddress,
-        address token,
+        address srcToken,
+        bytes32 dstToken,
         uint256 amount,
         bytes32 hashlock
     ) external returns (address htlcContract, bytes32 htlcId) {
         // Validate inputs
         if (amount == 0) revert ZeroAmount();
-        if (token == address(0)) revert InvalidToken();
+        if (srcToken == address(0)) revert InvalidToken();
         if (srcAddress == address(0)) revert InvalidSrcAddress();
         if (dstAddress == bytes32(0)) revert InvalidDstAddress();
+        if (dstToken == bytes32(0)) revert InvalidDstAddress(); // Reuse error for dst token
         if (hashlock == bytes32(0)) revert InvalidHashlock();
         
         // Generate unique HTLC ID
@@ -35,7 +37,8 @@ contract HTLCFactory is IHTLCFactory {
             msg.sender,     // resolver
             srcAddress,
             dstAddress,
-            token,
+            srcToken,
+            dstToken,
             amount,
             hashlock,
             block.timestamp
@@ -46,13 +49,14 @@ contract HTLCFactory is IHTLCFactory {
             msg.sender,     // resolver
             srcAddress,
             dstAddress,
-            token,
+            srcToken,
+            dstToken,
             amount,
             hashlock
         ));
         
         // Transfer tokens from resolver to HTLC
-        bool success = IERC20(token).transferFrom(msg.sender, htlcContract, amount);
+        bool success = IERC20(srcToken).transferFrom(msg.sender, htlcContract, amount);
         require(success, "Token transfer failed");
         
         // Update registries
@@ -67,7 +71,8 @@ contract HTLCFactory is IHTLCFactory {
             msg.sender,     // resolver
             srcAddress,
             dstAddress,
-            token,
+            srcToken,
+            dstToken,
             amount,
             hashlock,
             block.timestamp + 30    // finalityDeadline

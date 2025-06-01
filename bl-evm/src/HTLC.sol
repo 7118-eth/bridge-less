@@ -14,7 +14,8 @@ contract HTLC is IHTLC {
     address public immutable resolver;     // Who creates the escrow (coordinator)
     address public immutable srcAddress;   // Source of funds (maker on source chain)
     bytes32 public immutable dstAddress;   // Recipient (maker's Solana address)
-    address public immutable token;
+    address public immutable srcToken;     // ERC20 token on source chain
+    bytes32 public immutable dstToken;     // SPL token mint on destination chain
     uint256 public immutable amount;
     bytes32 public immutable hashlock;
     
@@ -34,14 +35,16 @@ contract HTLC is IHTLC {
     /// @param _resolver Address of the resolver (coordinator)
     /// @param _srcAddress Source address providing the tokens
     /// @param _dstAddress Destination address on Solana
-    /// @param _token ERC20 token to be locked
+    /// @param _srcToken ERC20 token to be locked on source chain
+    /// @param _dstToken SPL token mint to be released on destination chain
     /// @param _amount Amount of tokens to lock
     /// @param _hashlock SHA256 hash that must be unlocked
     constructor(
         address _resolver,
         address _srcAddress,
         bytes32 _dstAddress,
-        address _token,
+        address _srcToken,
+        bytes32 _dstToken,
         uint256 _amount,
         bytes32 _hashlock
     ) {
@@ -49,7 +52,8 @@ contract HTLC is IHTLC {
         resolver = _resolver;
         srcAddress = _srcAddress;
         dstAddress = _dstAddress;
-        token = _token;
+        srcToken = _srcToken;
+        dstToken = _dstToken;
         amount = _amount;
         hashlock = _hashlock;
         
@@ -83,7 +87,7 @@ contract HTLC is IHTLC {
         
         // Transfer tokens to destination address (in real bridge, this would be cross-chain)
         // For now, we transfer to the resolver who will handle the cross-chain transfer
-        bool success = IERC20(token).transfer(resolver, amount);
+        bool success = IERC20(srcToken).transfer(resolver, amount);
         if (!success) revert TransferFailed();
         
         emit HTLCWithdrawn(address(this), preimage, msg.sender);
@@ -106,7 +110,7 @@ contract HTLC is IHTLC {
         withdrawn = true;
         
         // Transfer tokens to resolver (who will handle cross-chain transfer)
-        bool success = IERC20(token).transfer(resolver, amount);
+        bool success = IERC20(srcToken).transfer(resolver, amount);
         if (!success) revert TransferFailed();
         
         emit HTLCWithdrawn(address(this), preimage, msg.sender);
@@ -125,9 +129,15 @@ contract HTLC is IHTLC {
         cancelled = true;
         
         // Return funds to source address
-        bool success = IERC20(token).transfer(srcAddress, amount);
+        bool success = IERC20(srcToken).transfer(srcAddress, amount);
         if (!success) revert TransferFailed();
         
         emit HTLCCancelled(address(this), msg.sender);
+    }
+    
+    /// @notice Get the token address (for backward compatibility)
+    /// @return The source token address
+    function token() external view returns (address) {
+        return srcToken;
     }
 }

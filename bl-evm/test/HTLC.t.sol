@@ -22,6 +22,9 @@ contract HTLCTest is Test {
     bytes32 public dstAddress = bytes32(uint256(0x4));
     address public randomUser = address(0x5);
     
+    // Solana token mint (example: USDC on Solana)
+    bytes32 public constant SOLANA_USDC = bytes32(keccak256("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"));
+    
     // Test values
     uint256 public constant AMOUNT = 1e6; // 1 token with 6 decimals
     bytes32 public secret = keccak256("test_secret");
@@ -53,7 +56,9 @@ contract HTLCTest is Test {
         assertEq(htlc.resolver(), resolver);
         assertEq(htlc.srcAddress(), srcAddress);
         assertEq(htlc.dstAddress(), dstAddress);
-        assertEq(htlc.token(), address(token));
+        assertEq(htlc.srcToken(), address(token));
+        assertEq(htlc.dstToken(), SOLANA_USDC);
+        assertEq(htlc.token(), address(token)); // Backward compatibility
         assertEq(htlc.amount(), AMOUNT);
         assertEq(htlc.hashlock(), hashlock);
         
@@ -242,6 +247,7 @@ contract HTLCTest is Test {
             srcAddress,
             dstAddress,
             address(token),
+            SOLANA_USDC,
             AMOUNT,
             hashlock
         );

@@ -67,9 +67,13 @@ interface IHTLC {
     /// @return The destination address as bytes32
     function dstAddress() external view returns (bytes32);
     
-    /// @notice Get the token being locked
-    /// @return The ERC20 token address
-    function token() external view returns (address);
+    /// @notice Get the source token being locked
+    /// @return The ERC20 token address on source chain
+    function srcToken() external view returns (address);
+    
+    /// @notice Get the destination token to be released
+    /// @return The SPL token mint address on destination chain
+    function dstToken() external view returns (bytes32);
     
     /// @notice Get the locked amount
     /// @return The amount of tokens locked
@@ -116,4 +120,8 @@ interface IHTLC {
     /// @notice Cancel the HTLC and return funds to source address
     /// @dev Only callable after cancellation deadline
     function cancel() external;
+    
+    /// @notice Get the token address (backward compatibility)
+    /// @return The source token address
+    function token() external view returns (address);
 }

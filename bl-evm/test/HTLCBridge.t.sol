@@ -18,6 +18,9 @@ contract HTLCBridgeTest is Test {
     address public userEVM = address(0x2);     // User on EVM side
     bytes32 public userSolana = bytes32(uint256(0x3)); // User on Solana side
     
+    // Token mappings
+    bytes32 public constant SOLANA_USDC = bytes32(keccak256("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"));
+    
     // Pre-funded liquidity
     uint256 public constant LIQUIDITY = 10_000e6; // 10k tokens
     uint256 public constant SWAP_AMOUNT = 1e6;    // 1 token per swap
@@ -47,6 +50,7 @@ contract HTLCBridgeTest is Test {
             userEVM,        // Source: user on EVM
             userSolana,     // Destination: user on Solana
             address(token),
+            SOLANA_USDC,    // Solana token
             SWAP_AMOUNT,
             hashlock
         );
@@ -97,6 +101,7 @@ contract HTLCBridgeTest is Test {
                 userEVM,
                 userSolana,
                 address(token),
+                SOLANA_USDC,
                 SWAP_AMOUNT,
                 hashlocks[i]
             );
@@ -133,6 +138,7 @@ contract HTLCBridgeTest is Test {
             userEVM,
             userSolana,
             address(token),
+            SOLANA_USDC,
             SWAP_AMOUNT,
             hashlock
         );
@@ -166,6 +172,7 @@ contract HTLCBridgeTest is Test {
             userEVM,
             userSolana,
             address(token),
+            SOLANA_USDC,
             SWAP_AMOUNT,
             hashlock
         );
@@ -198,6 +205,7 @@ contract HTLCBridgeTest is Test {
             userEVM,
             userSolana,
             address(token),
+            SOLANA_USDC,
             SWAP_AMOUNT,
             hashlock
         );
